@@ -1,0 +1,27 @@
+# ===================== Visual Studio / C# =====================
+# 编译输出
+[Bb]in/
+[Oo]bj/
+
+# 用户/解决方案缓存（含 .v11.suo 等）
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio 内部缓存
+.vs/
+
+# 测试结果
+TestResults/
+
+# NuGet 包（由 nuget restore / PackageReference 自动还原）
+packages/
+
+# Rider / 其他 IDE
+.idea/
+
+# ===================== 系统垃圾 =====================
+Thumbs.db
+Desktop.ini
+ehthumbs.db

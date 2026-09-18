@@ -1959,9 +1959,9 @@
             this.MainMOS.FillGradientColor = System.Drawing.Color.Transparent;
             this.MainMOS.FillGradientStyle = Microsoft.VisualBasic.PowerPacks.FillGradientStyle.Central;
             this.MainMOS.FillStyle = Microsoft.VisualBasic.PowerPacks.FillStyle.Solid;
-            this.MainMOS.Location = new System.Drawing.Point(845, 300);
+            this.MainMOS.Location = new System.Drawing.Point(1277, 492);
             this.MainMOS.Name = "MainMOS";
-            this.MainMOS.Size = new System.Drawing.Size(82, 81);
+            this.MainMOS.Size = new System.Drawing.Size(118, 118);
             this.MainMOS.Visible = false;
             // 
             // PWMMOS
@@ -1971,9 +1971,9 @@
             this.PWMMOS.FillGradientColor = System.Drawing.Color.Transparent;
             this.PWMMOS.FillGradientStyle = Microsoft.VisualBasic.PowerPacks.FillGradientStyle.Central;
             this.PWMMOS.FillStyle = Microsoft.VisualBasic.PowerPacks.FillStyle.Solid;
-            this.PWMMOS.Location = new System.Drawing.Point(980, 300);
+            this.PWMMOS.Location = new System.Drawing.Point(1480, 492);
             this.PWMMOS.Name = "PWMMOS";
-            this.PWMMOS.Size = new System.Drawing.Size(82, 81);
+            this.PWMMOS.Size = new System.Drawing.Size(118, 118);
             this.PWMMOS.Visible = false;
             // 
             // BLAN_32
@@ -2203,9 +2203,9 @@
             this.CHGMOS.FillGradientColor = System.Drawing.Color.Transparent;
             this.CHGMOS.FillGradientStyle = Microsoft.VisualBasic.PowerPacks.FillGradientStyle.Central;
             this.CHGMOS.FillStyle = Microsoft.VisualBasic.PowerPacks.FillStyle.Solid;
-            this.CHGMOS.Location = new System.Drawing.Point(980, 57);
+            this.CHGMOS.Location = new System.Drawing.Point(1480, 90);
             this.CHGMOS.Name = "CHGMOS";
-            this.CHGMOS.Size = new System.Drawing.Size(82, 81);
+            this.CHGMOS.Size = new System.Drawing.Size(118, 118);
             // 
             // DSGMOS
             // 
@@ -2214,9 +2214,9 @@
             this.DSGMOS.FillGradientColor = System.Drawing.Color.Transparent;
             this.DSGMOS.FillGradientStyle = Microsoft.VisualBasic.PowerPacks.FillGradientStyle.Central;
             this.DSGMOS.FillStyle = Microsoft.VisualBasic.PowerPacks.FillStyle.Solid;
-            this.DSGMOS.Location = new System.Drawing.Point(845, 57);
+            this.DSGMOS.Location = new System.Drawing.Point(1277, 90);
             this.DSGMOS.Name = "DSGMOS";
-            this.DSGMOS.Size = new System.Drawing.Size(82, 81);
+            this.DSGMOS.Size = new System.Drawing.Size(118, 118);
             // 
             // ovalShape1
             // 
@@ -5593,7 +5593,7 @@
             this.tabPage3.Padding = new System.Windows.Forms.Padding(4);
             this.tabPage3.Size = new System.Drawing.Size(1633, 906);
             this.tabPage3.TabIndex = 3;
-            this.tabPage3.Text = "校准";
+            this.tabPage3.Text = "校准控制";
             this.tabPage3.UseVisualStyleBackColor = true;
             // 
             // groupBox7
@@ -8987,7 +8987,7 @@
             // 
             this.label15.AutoSize = true;
             this.label15.Font = new System.Drawing.Font("宋体", 14.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label15.Location = new System.Drawing.Point(1266, 667);
+            this.label15.Location = new System.Drawing.Point(1282, 667);
             this.label15.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label15.Name = "label15";
             this.label15.Size = new System.Drawing.Size(116, 29);
@@ -8999,7 +8999,7 @@
             // 
             this.label31.AutoSize = true;
             this.label31.Font = new System.Drawing.Font("宋体", 14.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label31.Location = new System.Drawing.Point(1447, 667);
+            this.label31.Location = new System.Drawing.Point(1492, 667);
             this.label31.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label31.Name = "label31";
             this.label31.Size = new System.Drawing.Size(103, 29);

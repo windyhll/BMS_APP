@@ -16,7 +16,9 @@ namespace BMS上位机
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            BmsBridge.Start(8712);                     // 启动本地桥接服务（供演示网页取实时数据）
+            try { Application.Run(new Form1()); }
+            finally { BmsBridge.Stop(); }
         }
     }
 }

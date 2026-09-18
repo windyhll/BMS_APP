@@ -507,6 +507,29 @@ namespace BMS上位机
             label225.Text = "未连接!";
             label225.ForeColor = Color.Red; ;
 
+            // ---- 后台上传（每 500ms）：把实时数据推给演示网页，与串口读取解耦 ----
+            m_bridgeTimer = new System.Windows.Forms.Timer();
+            m_bridgeTimer.Interval = 500;
+            m_bridgeTimer.Tick += delegate(object s2, EventArgs e2) { PushToBridge(); };
+            m_bridgeTimer.Start();
+
+            // ---- 在「电池信息」页右下角空框内增加按钮：直接打开网页版演示 ----
+            m_btnOpenDemo = new Button();
+            m_btnOpenDemo.Text = "打开网页演示";
+            m_btnOpenDemo.Font = new System.Drawing.Font("Microsoft YaHei", 10F, System.Drawing.FontStyle.Bold);
+            m_btnOpenDemo.Size = new System.Drawing.Size(150, 42);
+            m_btnOpenDemo.BackColor = System.Drawing.Color.FromArgb(70, 150, 240);
+            m_btnOpenDemo.ForeColor = System.Drawing.Color.White;
+            m_btnOpenDemo.FlatStyle = FlatStyle.Flat;
+            // 位置交给 InitArtLayout/ApplyArtLayout 按"设计坐标 × 缩放比"摆放，
+            // 这样换电脑时它也跟背景图上的空框一起缩，不会偏（此处只给个初始值）
+            m_btnOpenDemo.Location = new System.Drawing.Point(10, 10);
+            m_btnOpenDemo.Click += delegate(object s3, EventArgs e3) { OpenDemoPage(); };
+            电池信息.Controls.Add(m_btnOpenDemo);
+            m_btnOpenDemo.BringToFront();
+
+            // ---- 电池信息页自动适配：让页面数据始终与背景图上的表格线/方框对齐 ----
+            InitArtLayout();
         }
 
         private void timer1_Tick(object sender, EventArgs e)
@@ -514,7 +537,7 @@ namespace BMS上位机
             comInfo.Text = "串口号：" + cboPortName.Text + "，波特率：" + serialPort1.BaudRate + ", 数据位：8";
             timeAndDate.Text = DateTime.Now.ToString("yyyy年MM月dd日 HH:mm:ss");
             comboBAUD.Enabled = !serialPort1.IsOpen;
-            if (tabControl1.SelectedTab.Text == "电池信息" | tabControl1.SelectedTab.Text == "校准")
+            if (tabControl1.SelectedTab.Text == "电池信息" | tabControl1.SelectedTab.Text == "校准控制")
             {
                 if (serialPort1.IsOpen)
                 {
@@ -4954,6 +4977,219 @@ namespace BMS上位机
         private void Current_Click(object sender, EventArgs e)
         {
 
+        }
+
+        // ==================================================================================
+        //  「电池信息」页自动适配
+        //  问题：背景图由 WinForms 按 Zoom 缩放（比例只取决于页面尺寸），而页面上的控件是按
+        //        "字体自动缩放"摆位的、VB PowerPacks 的圆点(形状)更是完全不缩放 —— 三者比例
+        //        不一致，换个分辨率/DPI 的电脑，数据就跟图上的表格线、方框错位。
+        //  做法：不让 WinForms 缩放背景图，改由本程序按"和控件同一套比例"画背景图：
+        //        背景图屏幕矩形 = 设计矩形 × (当前页面尺寸 ÷ 设计页面尺寸)；
+        //        形状(圆点/指示灯) 也按同一比例缩放。
+        //        ⇒ 图与控件永远同源同步，任何电脑/分辨率/DPI 都自动对齐，无需人工调整。
+        // ==================================================================================
+        private const double ART_DES_W = 1633.0, ART_DES_H = 906.0;   // 设计时的页面尺寸（Designer 里的 电池信息.Size）
+        // 「打开网页演示」按钮在设计页面里的中心 = 背景图右下角那个空框的"正中"
+        //   空框在背景图里是 x 1337..1760、y 730..859（图像素）
+        //   换算：设计x = imgx × 0.92679 ；设计y = 34.1 + imgy × 0.9268
+        //   ⇒ 空框中心 = ((1337+1760)/2, (730+859)/2) 图像素 → 设计 (1435, 771)
+        private const double BTN_DES_CX = 1435.0, BTN_DES_CY = 771.0;
+        private Button m_btnOpenDemo;
+        private Image m_artImg;                     // 背景图
+        private RectangleF m_artDesign;             // 背景图在"设计页面"里的矩形
+        private Rectangle m_artRect;                // 背景图当前的屏幕矩形
+        private readonly System.Collections.Generic.List<object[]> _artShapes =
+            new System.Collections.Generic.List<object[]>();
+
+        private void InitArtLayout()
+        {
+            if (m_artImg != null || 电池信息 == null || 电池信息.BackgroundImage == null) return;
+            try
+            {
+                Size cs = 电池信息.ClientSize;
+                if (cs.Width < 20 || cs.Height < 20) return;       // 页面还没成形，等下次
+
+                // 1) 背景图在设计页面里的矩形（等比缩放并居中，与 WinForms 的 Zoom 规则一致）
+                m_artImg = 电池信息.BackgroundImage;
+                double k0 = Math.Min(ART_DES_W / m_artImg.Width, ART_DES_H / m_artImg.Height);
+                m_artDesign = new RectangleF(
+                    (float)((ART_DES_W - m_artImg.Width * k0) / 2.0),
+                    (float)((ART_DES_H - m_artImg.Height * k0) / 2.0),
+                    (float)(m_artImg.Width * k0), (float)(m_artImg.Height * k0));
+
+                // 2) 背景交给我们自己画（去掉 WinForms 的缩放），确保与控件同一比例
+                电池信息.BackgroundImage = null;
+                电池信息.BackgroundImageLayout = ImageLayout.None;
+                电池信息.Paint += delegate(object s0, PaintEventArgs e0)
+                {
+                    if (m_artImg != null && m_artRect.Width > 0)
+                        e0.Graphics.DrawImage(m_artImg, m_artRect);
+                };
+
+                // 3) 形状：PowerPacks 不参与自动缩放 → 按"设计坐标 × 比例"重新摆
+                //    （形状坐标相对 shapeContainer1；容器自身的位置保持 WinForms 缩放后的值不动，
+                //      这样"容器位置 + 形状坐标"正好 = 设计坐标 × 比例，取整误差最小）
+                foreach (Microsoft.VisualBasic.PowerPacks.Shape s in shapeContainer1.Shapes)
+                {
+                    // 注意：Location/Size 定义在 SimpleShape 上，Shape 基类没有
+                    Microsoft.VisualBasic.PowerPacks.SimpleShape ss =
+                        s as Microsoft.VisualBasic.PowerPacks.SimpleShape;
+                    if (ss == null) continue;
+                    _artShapes.Add(new object[] { ss, new Rectangle(
+                        ss.Location.X, ss.Location.Y,
+                        Math.Max(4, ss.Size.Width), Math.Max(4, ss.Size.Height)) });
+                }
+
+                // 4) 应用一次即可：TabControl 不随窗口缩放，页面尺寸此后不会变
+                ApplyArtLayout();
+            }
+            catch { }
+        }
+
+        private void ApplyArtLayout()
+        {
+            try
+            {
+                Size cs = 电池信息.ClientSize;
+                if (cs.Width < 20 || cs.Height < 20) return;
+                double fx = (double)cs.Width / ART_DES_W;
+                double fy = (double)cs.Height / ART_DES_H;
+
+                // 背景图：设计矩形 × 缩放比
+                m_artRect = new Rectangle(
+                    (int)Math.Round(m_artDesign.X * fx), (int)Math.Round(m_artDesign.Y * fy),
+                    Math.Max(1, (int)Math.Round(m_artDesign.Width * fx)),
+                    Math.Max(1, (int)Math.Round(m_artDesign.Height * fy)));
+
+                // 形状容器覆盖整页，避免缩放后越界被裁剪
+                if (shapeContainer1 != null)
+                    shapeContainer1.Size = new Size(Math.Max(200, cs.Width), Math.Max(200, cs.Height));
+
+                foreach (object[] o in _artShapes)
+                {
+                    Microsoft.VisualBasic.PowerPacks.SimpleShape s =
+                        o[0] as Microsoft.VisualBasic.PowerPacks.SimpleShape;
+                    Rectangle R = (Rectangle)o[1];
+                    if (s == null) continue;
+                    s.Location = new Point(
+                        (int)Math.Round(R.X * fx), (int)Math.Round(R.Y * fy));
+                    s.Size = new Size(
+                        Math.Max(4, (int)Math.Round(R.Width * fx)),
+                        Math.Max(4, (int)Math.Round(R.Height * fy)));
+                }
+                // 网页演示按钮：按设计坐标 × 缩放比摆放（与背景图上的空框一起缩放，换机不偏）
+                if (m_btnOpenDemo != null)
+                {
+                    int bx = (int)Math.Round(BTN_DES_CX * fx) - m_btnOpenDemo.Width / 2;
+                    int by = (int)Math.Round(BTN_DES_CY * fy) - m_btnOpenDemo.Height / 2;
+                    if (bx + m_btnOpenDemo.Width > cs.Width) bx = cs.Width - m_btnOpenDemo.Width - 8;
+                    if (by + m_btnOpenDemo.Height > cs.Height) by = cs.Height - m_btnOpenDemo.Height - 8;
+                    m_btnOpenDemo.Location = new Point(Math.Max(8, bx), Math.Max(8, by));
+                }
+                电池信息.Invalidate();
+            }
+            catch { }
+        }
+
+
+        // ---- 后台上传：定时把界面实时数据推给本地桥接服务（供演示网页）----
+        // 电流单位与界面一致（mA）；SOC 为 %。
+        private System.Windows.Forms.Timer m_bridgeTimer;
+        private double _bgSolar, _bgMains, _bgLoad, _bgSoc, _bgRsoc, _bgFcc, _bgVpack, _bgPsolar, _bgPload, _bgTemp;
+        private double _bgTOn, _bgTOff;   // BMS 设定的加热启动/停止温度
+
+        // ---- 电池温度：取各路 NTC 的最小值（最冷那一路上报，供加热毯判定）----
+        private double MinNtcTemp()
+        {
+            try
+            {
+                Control[] ntcs = { NTC1, NTC2, NTC3, NTC4, NTC5, NTC6, NTC7, NTC8 };
+                int cnt = Math.Min(m_ntcNum, ntcs.Length);
+                double min = double.MaxValue; int n = 0;
+                for (int i = 0; i < cnt; i++)
+                {
+                    if (ntcs[i] == null) continue;
+                    double v;
+                    if (double.TryParse(ntcs[i].Text, out v)) { if (v < min) min = v; n++; }
+                }
+                if (n > 0) _bgTemp = min;
+            }
+            catch { }
+            return _bgTemp;
+        }
+
+        // 空/非法字符串时沿用上次有效值，避免"读取时机"造成瞬时跳 0
+        private static double Keep(string s, ref double cache)
+        {
+            if (!string.IsNullOrEmpty(s))
+            {
+                double v;
+                if (double.TryParse(s, out v)) cache = v;
+            }
+            return cache;
+        }
+        private void PushToBridge()
+        {
+            try
+            {
+                // 顺序：光伏电流、市电电流、负载电流(Current)、SOC、剩余容量、满充容量、总压、光伏功率、负载功率、温度
+                BmsBridge.Update(
+                    Keep(iSolar.Text, ref _bgSolar),
+                    Keep(iMainSupply.Text, ref _bgMains),
+                    Keep(Current.Text, ref _bgLoad),
+                    Keep(SOC.Text, ref _bgSoc),
+                    Keep(RSOC.Text, ref _bgRsoc),
+                    Keep(FCC.Text, ref _bgFcc),
+                    Keep(vPack.Text, ref _bgVpack),
+                    Keep(pSolar.Text, ref _bgPsolar),
+                    Keep(pLoad.Text, ref _bgPload),
+                    MinNtcTemp(),                            // 电池温度：多路 NTC 取最小值 ℃
+                    Keep(tempStart.Text, ref _bgTOn),        // BMS 设定：开始加热温度 ℃
+                    Keep(tempEnd.Text, ref _bgTOff));        // BMS 设定：停止加热温度 ℃
+            }
+            catch { }
+        }
+
+        // ---- 打开网页版演示（本机桥接服务提供的演示页）----
+        private void OpenDemoPage()
+        {
+            try
+            {
+                if (!BmsBridge.Running)
+                {
+                    MessageBox.Show(null, "桥接服务未启动，无法打开演示页。", "提示",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                string url = "http://127.0.0.1:" + BmsBridge.Port + "/";
+                // 演示页用现代 CSS/JS（CSS 变量、ES6），IE 无法正常显示 —— 优先用 Chrome / Edge 打开
+                string[] browsers = new string[]
+                {
+                    @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                    @"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+                };
+                foreach (string exe in browsers)
+                {
+                    try
+                    {
+                        if (System.IO.File.Exists(exe))
+                        {
+                            System.Diagnostics.Process.Start(exe, url);
+                            return;
+                        }
+                    }
+                    catch { }
+                }
+                System.Diagnostics.Process.Start(url);   // 兜底：系统默认浏览器
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(null, "打开演示页失败：" + ex.Message, "提示",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void label141_Click(object sender, EventArgs e)

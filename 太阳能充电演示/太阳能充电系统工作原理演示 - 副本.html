@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>太阳能充电系统 · 工作原理演示</title>
+<style>
+  :root{
+    --bg0:#0b1220; --bg1:#0f1a2e; --panel:rgba(255,255,255,.045);
+    --line:rgba(255,255,255,.09); --txt:#e2e8f0; --sub:#94a3b8;
+    --amber:#fbbf24; --cyan:#22d3ee; --green:#34d399; --orange:#fb923c;
+    --red:#f87171; --blue:#38bdf8; --white:#f1f5f9;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:radial-gradient(1200px 700px at 30% -10%, #16233f 0%, var(--bg0) 55%) , var(--bg1);
+    color:var(--txt);
+    font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    display:grid; grid-template-rows:auto 1fr auto; gap:10px;
+    padding:12px 16px; overflow:hidden; user-select:none;
+  }
+  /* ===== 顶栏 ===== */
+  header{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  #brand{
+    background:transparent; border:none; outline:none; color:var(--txt);
+    font-size:22px; font-weight:700; letter-spacing:1px; width:340px;
+    border-bottom:1px dashed rgba(255,255,255,.25); padding:2px 4px;
+  }
+  .subtitle{color:var(--sub); font-size:13px; letter-spacing:2px;}
+  header .spacer{flex:1;}
+  #clock{font-variant-numeric:tabular-nums; font-size:20px; color:var(--blue); font-weight:700;}
+  #clock small{font-size:11px; color:var(--sub); display:block; text-align:center; font-weight:400;}
+  .badge{
+    font-size:15px; font-weight:700; padding:7px 16px; border-radius:999px;
+    border:1px solid var(--line); background:var(--panel); white-space:nowrap;
+  }
+  .badge.ok{color:var(--green); border-color:rgba(52,211,153,.4);}
+  .badge.warn{color:var(--cyan); border-color:rgba(34,211,238,.5); animation:pulse 1.6s infinite;}
+  .badge.danger{color:var(--red); border-color:rgba(248,113,113,.5); animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,211,238,.25);}50%{box-shadow:0 0 18px 2px rgba(34,211,238,.28);}}
+  button{
+    background:var(--panel); color:var(--txt); border:1px solid var(--line);
+    border-radius:8px; padding:7px 14px; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  button:hover{border-color:var(--blue); color:var(--blue);}
+  /* ===== 主区 ===== */
+  main{display:grid; grid-template-columns:1fr 330px; gap:12px; min-height:0;}
+  #stage{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    display:flex; align-items:center; justify-content:center; overflow:hidden; min-height:0;
+  }
+  #scene{width:100%; height:100%;}
+  /* ===== 右侧数据栏 ===== */
+  aside{display:flex; flex-direction:column; gap:10px; min-height:0; overflow:auto;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px;}
+  .card h3{font-size:12px; color:var(--sub); font-weight:400; letter-spacing:2px; margin-bottom:6px;}
+  .soc-wrap{display:flex; align-items:center; gap:10px;}
+  .soc-card{display:flex; flex-direction:column; gap:6px;}
+  #socTrend{width:100%; height:52px; background:rgba(255,255,255,.03); border-radius:8px; display:block;}
+  #socTrend .th{stroke-dasharray:3 3; stroke-width:1;}
+  .th-start{stroke:#f87171;} .th-rec{stroke:#fbbf24;}
+  #hb{width:9px; height:9px; border-radius:50%; background:#34d399; box-shadow:0 0 7px #34d399;
+      display:inline-block; transition:opacity .1s;}
+  .ver{font-size:12px; font-weight:700; color:#7dd3fc; border:1px solid rgba(56,189,248,.35);
+       border-radius:999px; padding:3px 10px; background:rgba(56,189,248,.08);
+       font-variant-numeric:tabular-nums; cursor:help; white-space:nowrap;}
+  #socNum{font-size:30px; font-weight:800; font-variant-numeric:tabular-nums; fill:var(--txt);}
+  .soc-sub{font-size:11px; color:var(--sub);}
+  .meters{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .meter{border:1px solid var(--line); border-radius:10px; padding:8px 10px; background:rgba(255,255,255,.03);}
+  .m-name{font-size:12px; color:var(--sub); display:flex; justify-content:space-between;}
+  .m-code{font-weight:700;}
+  .m-val{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.25;}
+  .m-val small{font-size:12px; color:var(--sub); font-weight:400; margin-left:3px;}
+  .m-sub{font-size:10px; color:var(--sub); min-height:13px;}
+  .c-amber{color:var(--amber);} .c-cyan{color:var(--cyan);} .c-green{color:var(--green);}
+  .c-orange{color:var(--orange);} .c-white{color:var(--white);} .c-red{color:var(--red);}
+  .formula{text-align:center;}
+  .f-line{font-size:19px; font-weight:800; letter-spacing:1px;}
+  .f-nums{font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:3px; letter-spacing:1px;}
+  .f-exp{font-size:12px; color:var(--sub); margin-top:6px; line-height:1.5; min-height:36px;}
+  #sceneState{font-size:14px; font-weight:700; color:var(--blue);}
+  #log{list-style:none; max-height:130px; overflow-y:auto; font-size:12px;}
+  #log li{padding:3px 0; border-bottom:1px dashed rgba(255,255,255,.06); color:var(--sub); line-height:1.45;}
+  #log li b{font-variant-numeric:tabular-nums; color:var(--blue); font-weight:600; margin-right:6px;}
+  #log li.ev-in b{color:var(--cyan);} #log li.ev-out b{color:var(--green);}
+  #log li.ev-warn b{color:var(--orange);} #log li.ev-full b{color:var(--amber);}
+  /* ===== 底部控制 ===== */
+  footer{display:flex; gap:14px; align-items:center; flex-wrap:wrap; background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:10px 14px;}
+  .mode-group{display:flex; border:1px solid var(--line); border-radius:9px; overflow:hidden;}
+  .mode-group button{border:none; border-radius:0; padding:8px 14px; font-size:14px; background:transparent;}
+  .mode-group button.on{background:var(--blue); color:#04121f; font-weight:700;}
+  .sl{display:flex; align-items:center; gap:8px; font-size:13px;}
+  .sl label{color:var(--sub); white-space:nowrap;}
+  .sl output{font-variant-numeric:tabular-nums; font-weight:700; width:52px; text-align:right;}
+  input[type=range]{width:130px; accent-color:var(--blue);}
+  .set{display:flex; gap:10px; align-items:center; margin-left:auto; flex-wrap:wrap;}
+  .st{display:flex; align-items:center; gap:5px; font-size:12px; color:var(--sub); white-space:nowrap;}
+  .st input[type=number]{width:58px; background:rgba(255,255,255,.06); border:1px solid var(--line);
+    color:var(--txt); border-radius:6px; padding:4px 6px; font-size:13px; font-variant-numeric:tabular-nums;}
+  .st input[type=text]{width:120px; background:rgba(255,255,255,.06); border:1px solid var(--line);
+    color:var(--txt); border-radius:6px; padding:4px 6px; font-size:12px;}
+  #sceneName{fill:var(--amber); font-size:17px; font-weight:700; letter-spacing:1px;
+    paint-order:stroke; stroke:#0b1220; stroke-width:5;}
+  input[type=range]:disabled{opacity:.45;}
+  @media (max-width:1100px){
+    main{grid-template-columns:1fr;} aside{display:grid; grid-template-columns:1fr 1fr;}
+    body{overflow:auto;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <input id="brand" value="BMS 智能光伏供电系统" title="点击可修改展示名称">
+  <span class="subtitle">太阳能充电系统 · 工作原理动态演示</span>
+  <span id="verBadge" class="ver"></span>
+  <span class="spacer"></span>
+  <span id="modeBadge" class="badge ok">☀ 光伏独立供电</span>
+  <span id="hb" title="仿真心跳：闪烁表示积分运行中"></span>
+  <div id="clock">06:00<small>仿真时间</small></div>
+  <button id="btnFs">⛶ 全屏</button>
+</header>
+
+<main>
+  <!-- ============ 左：系统场景图 ============ -->
+  <section id="stage">
+  <svg id="scene" viewBox="0 0 1040 660" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <filter id="glowBms" x="-40%" y="-40%" width="180%" height="180%">
+        <feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="#38bdf8" flood-opacity="0.5"/>
+      </filter>
+      <filter id="glowLine" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#fbbf24" flood-opacity="0.5"/>
+      </filter>
+      <radialGradient id="lampGlow"><stop offset="0%" stop-color="#fde68a" stop-opacity=".85"/>
+        <stop offset="100%" stop-color="#fde68a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="sunGlow"><stop offset="0%" stop-color="#fde047" stop-opacity=".55"/>
+        <stop offset="100%" stop-color="#fde047" stop-opacity="0"/></radialGradient>
+    </defs>
+
+    <!-- ===== 太阳与云 ===== -->
+    <g id="sunG">
+      <circle cx="205" cy="64" r="70" fill="url(#sunGlow)" id="sunHalo"/>
+      <g id="sunRays" stroke="#fde047" stroke-width="3" stroke-linecap="round"></g>
+      <circle cx="205" cy="64" r="26" fill="#fbbf24" id="sunBall"/>
+    </g>
+    <g id="cloud1" opacity="0" fill="#64748b">
+      <ellipse cx="255" cy="56" rx="36" ry="16"/><ellipse cx="230" cy="64" rx="24" ry="12"/><ellipse cx="282" cy="63" rx="26" ry="13"/>
+    </g>
+    <g id="cloud2" opacity="0" fill="#526075">
+      <ellipse cx="150" cy="76" rx="30" ry="13"/><ellipse cx="128" cy="82" rx="19" ry="10"/><ellipse cx="172" cy="82" rx="21" ry="11"/>
+    </g>
+
+    <!-- ===== 光伏阵列（单块）===== -->
+    <g id="pvG">
+      <text x="202" y="124" text-anchor="middle" font-size="15" fill="#e2e8f0" font-weight="700">光伏阵列</text>
+      <rect x="100" y="132" width="205" height="118" rx="6" fill="#123152" stroke="#2b5b8a" stroke-width="2"/>
+      <rect id="pvLit" x="100" y="132" width="205" height="118" rx="6" fill="#38bdf8" opacity="0.3"/>
+      <g stroke="#2b5b8a" stroke-width="1.5">
+        <line x1="151" y1="132" x2="151" y2="250"/><line x1="202" y1="132" x2="202" y2="250"/>
+        <line x1="253" y1="132" x2="253" y2="250"/><line x1="100" y1="171" x2="305" y2="171"/>
+        <line x1="100" y1="210" x2="305" y2="210"/>
+      </g>
+    </g>
+
+    <!-- ===== 市电电网 ===== -->
+    <g id="gridG">
+      <g transform="translate(915,60)" stroke="#7dd3fc" stroke-width="3" fill="none" stroke-linecap="round">
+        <path d="M-26,140 L-9,10 L9,10 L26,140"/>
+        <path d="M-20,108 L20,108 M-15,74 L15,74 M-11,44 L11,44"/>
+        <path d="M-26,44 C-58,52 -66,52 -92,46" stroke-width="2"/>
+        <path d="M26,44 C58,52 66,52 92,46" stroke-width="2"/>
+      </g>
+      <path d="M920,32 L908,58 L918,58 L906,86 L928,54 L917,54 L928,32 Z" fill="#22d3ee" opacity=".9"/>
+      <text x="915" y="222" text-anchor="middle" font-size="15" fill="#e2e8f0" font-weight="700">市电电网</text>
+      <text x="915" y="240" text-anchor="middle" font-size="11" fill="#94a3b8">AC 220V → DC 互补输入</text>
+    </g>
+
+    <!-- ===== 导线（底层暗线）===== -->
+    <g fill="none" stroke="#31415c" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+      <path id="pvBase"   d="M202,250 L202,302 L530,302 L530,344"/>
+      <path id="gridBase" d="M915,246 L915,420 L656,420"/>
+      <path id="battBase" d="M470,502 L470,574 L324,574"/>
+      <path id="loadBase" d="M590,502 L590,574 L914,574"/>
+    </g>
+    <!-- ===== 导线（能量流层，JS 驱动虚线滚动）===== -->
+    <g fill="none" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+      <path id="pvPath"   d="M202,250 L202,302 L530,302 L530,344" stroke="#fbbf24" stroke-dasharray="11 14"/>
+      <path id="gridPath" d="M915,246 L915,420 L656,420" stroke="#22d3ee" stroke-dasharray="11 14"/>
+      <path id="battPath" d="M470,502 L470,574 L324,574" stroke="#34d399" stroke-dasharray="11 14"/>
+      <path id="loadPath" d="M590,502 L590,574 L914,574" stroke="#fcd34d" stroke-dasharray="11 14"/>
+    </g>
+    <g id="particles"></g>
+
+    <!-- 电流标签 -->
+    <g font-size="15" font-variant-numeric="tabular-nums" paint-order="stroke" stroke="#0b1220" stroke-width="5">
+      <text id="lb1" x="216" y="288" fill="#fbbf24" font-weight="700">I₁ 0.0 A</text>
+      <text id="lb3" x="742" y="410" fill="#22d3ee" font-weight="700">I₃ 0.0 A</text>
+      <text id="lb4" x="368" y="564" fill="#34d399" font-weight="700">I₄ 0.0 A</text>
+      <text id="lb5" x="636" y="564" fill="#fcd34d" font-weight="700">I₂ 0.0 A</text>
+    </g>
+
+    <!-- 场景状态（剧情名，随场景切换更新） -->
+    <text id="sceneName" x="345" y="128">清晨 · 日出光伏渐强</text>
+
+    <!-- ===== BMS 主机 ===== -->
+    <g id="bmsG">
+      <rect x="410" y="348" width="240" height="150" rx="14" fill="#0d2137" stroke="#38bdf8"
+            stroke-width="2.5" filter="url(#glowBms)"/>
+      <text x="530" y="384" text-anchor="middle" font-size="25" font-weight="800" fill="#7dd3fc" letter-spacing="4">BMS</text>
+      <text x="530" y="406" text-anchor="middle" font-size="13" fill="#cbd5e1">智能电池管理系统</text>
+      <text id="bmsState" x="530" y="432" text-anchor="middle" font-size="14.5" font-weight="700" fill="#34d399">太阳能供电 · 电池充电中</text>
+      <text id="bmsPolicy" x="530" y="455" text-anchor="middle" font-size="11" fill="#94a3b8">MPPT 追踪 · 智能功率分配</text>
+      <text x="530" y="486" text-anchor="middle" font-size="10.5" fill="#64748b">光伏充电输入 · 市电互补 · 过充过放保护</text>
+      <!-- 端口 -->
+      <g fill="#38bdf8" stroke="#0b1220" stroke-width="2">
+        <circle cx="530" cy="348" r="6"/>
+        <circle cx="650" cy="420" r="6"/><circle cx="470" cy="498" r="6"/><circle cx="590" cy="498" r="6"/>
+      </g>
+      <g font-size="11" fill="#94a3b8">
+        <text x="530" y="340" text-anchor="middle">PV</text>
+        <text x="640" y="440" text-anchor="middle">市电</text>
+        <text x="470" y="492" text-anchor="middle">电池</text>
+        <text x="592" y="492" text-anchor="middle">负载</text>
+      </g>
+    </g>
+
+    <!-- ===== 电池组 ===== -->
+    <g id="battG">
+      <text id="battCap" x="225" y="646" text-anchor="middle" font-size="14" fill="#e2e8f0" font-weight="700">电池组 · 100Ah</text>
+      <rect x="322" y="560" width="12" height="28" rx="3" fill="#475569"/>
+      <rect x="140" y="520" width="184" height="108" rx="10" fill="#0f1c30" stroke="#475569" stroke-width="2.5"/>
+      <clipPath id="battClip"><rect x="147" y="527" width="170" height="94" rx="7"/></clipPath>
+      <rect id="battFill" x="147" y="527" width="102" height="94" fill="#34d399" clip-path="url(#battClip)" opacity=".85"/>
+      <text id="battPct" x="232" y="586" text-anchor="middle" font-size="27" font-weight="800"
+            fill="#f1f5f9" font-variant-numeric="tabular-nums" paint-order="stroke" stroke="#0b1220" stroke-width="4">60%</text>
+      <text id="battArrow" x="232" y="556" text-anchor="middle" font-size="15" font-weight="800"
+            fill="#34d399" paint-order="stroke" stroke="#0b1220" stroke-width="4">▲ 充电</text>
+    </g>
+
+    <!-- ===== 负载灯组 ===== -->
+    <g id="lampG">
+      <text x="832" y="646" text-anchor="middle" font-size="14" fill="#e2e8f0" font-weight="700">负载 · 展示灯组</text>
+      <g id="lamp1" transform="translate(772,574)">
+        <circle class="halo" r="40" fill="url(#lampGlow)" opacity="0"/>
+        <circle class="bulb" r="23" fill="#1e293b" stroke="#64748b" stroke-width="2.5"/>
+        <path class="fil" d="M-8,6 L-4,-4 L0,6 L4,-4 L8,6" fill="none" stroke="#475569" stroke-width="2.5"/>
+        <rect x="-9" y="21" width="18" height="10" rx="2" fill="#475569"/>
+      </g>
+      <g id="lamp2" transform="translate(832,574)">
+        <circle class="halo" r="40" fill="url(#lampGlow)" opacity="0"/>
+        <circle class="bulb" r="23" fill="#1e293b" stroke="#64748b" stroke-width="2.5"/>
+        <path class="fil" d="M-8,6 L-4,-4 L0,6 L4,-4 L8,6" fill="none" stroke="#475569" stroke-width="2.5"/>
+        <rect x="-9" y="21" width="18" height="10" rx="2" fill="#475569"/>
+      </g>
+      <g id="lamp3" transform="translate(892,574)">
+        <circle class="halo" r="40" fill="url(#lampGlow)" opacity="0"/>
+        <circle class="bulb" r="23" fill="#1e293b" stroke="#64748b" stroke-width="2.5"/>
+        <path class="fil" d="M-8,6 L-4,-4 L0,6 L4,-4 L8,6" fill="none" stroke="#475569" stroke-width="2.5"/>
+        <rect x="-9" y="21" width="18" height="10" rx="2" fill="#475569"/>
+      </g>
+    </g>
+  </svg>
+  </section>
+
+  <!-- ============ 右：数据面板 ============ -->
+  <aside>
+    <div class="card soc-card">
+      <div class="soc-wrap">
+        <svg width="128" height="128" viewBox="0 0 150 150">
+          <circle cx="75" cy="75" r="62" fill="none" stroke="#22304a" stroke-width="11"/>
+          <circle id="socArc" cx="75" cy="75" r="62" fill="none" stroke="#34d399" stroke-width="11"
+                  stroke-linecap="round" stroke-dasharray="389.6" stroke-dashoffset="155.8"
+                  transform="rotate(-90 75 75)" style="transition:stroke .4s;"/>
+          <text id="socNum" x="75" y="80" text-anchor="middle">60.0%</text>
+          <text x="75" y="103" text-anchor="middle" font-size="12" fill="#94a3b8">电池 SOC</text>
+        </svg>
+        <div>
+          <div id="sceneState">自动演示中</div>
+          <div class="soc-sub" id="socHint">SOC 高于恢复阈值，市电待命</div>
+        </div>
+      </div>
+      <svg id="socTrend" viewBox="0 0 120 60" preserveAspectRatio="none">
+        <line class="th th-start" x1="0" y1="46.4" x2="120" y2="46.4"/>
+        <line class="th th-rec" x1="0" y1="41.6" x2="120" y2="41.6"/>
+        <polyline id="socLine" fill="none" stroke="#38bdf8" stroke-width="1.6"
+                  vector-effect="non-scaling-stroke" points=""/>
+        <circle id="socDot" r="2.2" fill="#38bdf8" cx="0" cy="0"/>
+      </svg>
+    </div>
+
+    <div class="card">
+      <h3>实时电流监测</h3>
+      <div class="meters">
+        <div class="meter"><div class="m-name">太阳能电流 <span class="m-code c-amber">I₁</span></div>
+          <div class="m-val c-amber"><b id="v1">0.0</b><small>A</small></div>
+          <div class="m-sub" id="s1">光伏出力跟随光照</div></div>
+        <div class="meter"><div class="m-name">负载电流 <span class="m-code c-white">I₂</span></div>
+          <div class="m-val c-white"><b id="v2">0.0</b><small>A</small></div>
+          <div class="m-sub" id="s2">展示灯组功耗</div></div>
+        <div class="meter"><div class="m-name">市电电流 <span class="m-code c-cyan">I₃</span></div>
+          <div class="m-val c-cyan"><b id="v3">0.0</b><small>A</small></div>
+          <div class="m-sub" id="s3">低电量时自动介入</div></div>
+        <div class="meter"><div class="m-name">电池电流 <span class="m-code" id="c4">I₄</span></div>
+          <div class="m-val" id="w4"><b id="v4">0.0</b><small>A</small></div>
+          <div class="m-sub" id="s4">正值充电 · 负值放电</div></div>
+      </div>
+    </div>
+
+    <div class="card formula">
+      <h3>能量平衡方程</h3>
+      <div class="f-line"><span class="c-amber">I₁</span> + <span class="c-cyan">I₃</span> = <span class="c-white">I₂</span> + <span class="c-green">I₄</span></div>
+      <div class="f-nums" id="fNums">0.0 + 0.0 = 0.0 + 0.0</div>
+      <div class="f-exp" id="fExp">—</div>
+    </div>
+
+    <div class="card">
+      <h3>系统事件日志</h3>
+      <ul id="log"></ul>
+    </div>
+  </aside>
+</main>
+
+<!-- ============ 底部控制台 ============ -->
+<footer>
+  <div class="mode-group">
+    <button id="btnAuto" class="on">▶ 自动演示</button>
+    <button id="btnMan">✋ 手动控制</button>
+    <button id="btnLive">📡 BMS 实时</button>
+  </div>
+  <div class="sl"><label>光伏</label><input type="range" id="rPv" min="0" max="100" value="0" disabled><output id="oPv">0%</output></div>
+  <div class="sl"><label>负载</label><input type="range" id="rLoad" min="0" max="100" value="50" disabled><output id="oLoad">50%</output></div>
+  <div class="sl"><label>市电电流</label><input type="range" id="rGrid" min="0" max="10" step="0.5" value="10" disabled><output id="oGrid">10.0A</output></div>
+  <div class="set">
+    <span class="st">启动阈值 <input type="number" id="nStart" min="5" max="50" value="20"> %</span>
+    <span class="st">恢复阈值 <input type="number" id="nRecover" min="6" max="60" value="30"> %</span>
+    <span class="st">时间加速 <input type="number" id="nSpeed" min="60" max="3600" step="60" value="900"> ×</span>
+    <span class="st">SOC设定 <input type="number" id="nSoc" min="5" max="100" value="60"> %</span>
+    <span class="st">品牌 <input type="text" id="nBrand" value="BMS 智能光伏供电系统"></span>
+    <button id="btnReset">↺ 复位</button>
+  </div>
+</footer>
+
+<script>
+/* ================= 版本号：每次修改统一更新此处 =================
+   注意：仅定义常量，DOM 赋值在脚本末尾「启动」区执行
+   （此处在 $ 函数定义之前，直接访问 DOM 会触发暂时性死区错误） */
+const APP_VER='v3.2';
+const VER_LOG=[
+  'v3.2 新增 BMS 实时模式 —— 接入上位机本地桥接数据（@8712），仅更新数据不做仿真；负载 I₂=I₃−Current、电池 I₄=I₁+Current',
+  'v3.1 撤销负载限幅 —— 市电介入时电池继续输出补足缺口，负载全程不断电不降额',
+  'v3.0 手动模式全权化 —— 日照门控与负载限幅仅自动演示生效，手动电流完全跟随设定；SOC 满电时市电自动退出（手动模式 SOC<95% 恢复）',
+  'v2.9 负载智能限幅 —— 市电投入时负载耗电≤市电 80%，确保边供负载边回充；场景状态移入舞台画面；修复剧情市电电流控制失效（grid/gridSet 键名错位，v2.0 起潜伏）',
+  'v2.8 光伏日照门控 —— 18:00 日落后至次日 06:00 日出前光伏休眠（跨 0 点同样无出力），市电默认电流 8A→10A',
+  'v2.7 剧情时钟对齐 —— 清晨 06:00 日起、正午 12:00、日落 18:00、夜间/市电深夜，初始与复位改为 06:00',
+  'v2.6 修复 SOC 永久冻结 —— 补回 v2.0 重写时丢失的电池容量参数 cap:100（NaN 防护曾掩盖此根因）',
+  'v2.5 修复版本徽章空显示 —— v2.4 顶层引用未定义的 $ 函数导致整页脚本崩溃',
+  'v2.4 页面版本号显示机制',
+  'v2.3 SOC 趋势曲线 · 脉冲高亮 · 1200× 加速 · 负载自然波动',
+  'v2.2 仿真与渲染分离 · 墙钟追帧 · SOC 积分速率显示',
+  'v2.1 NaN 三层防护 · SOC 手动设定',
+  'v2.0 单块光伏阵列 · 市电电流滑块可调',
+  'v1.0 首版：双路光伏 · 自动演示 · 能量平衡方程'
+];
+
+/* ================= 参数配置 ================= */
+const CFG = {
+  pvMax: 10,      // 光伏最大输出电流 A
+  loadMax: 12,    // 负载最大电流 A
+  gridMax: 10,    // 市电最大输入电流 A（滑块上限）
+  cap: 100,       // 电池容量 Ah（SOC 积分分母，缺失会导致 SOC 永久冻结）
+  mA2A: 0.001,    // BMS 桥接电流单位：mA → A
+  /* 实时数据源：页面由上位机服务提供时同源（相对地址）；本地文件打开则连本机 8712 */
+  api: (location.protocol==='http:'||location.protocol==='https:') ? '' : 'http://localhost:8712'
+};
+
+/* ================= 运行状态 ================= */
+const sim = {
+  pv: 0, load: 50, gridSet: 10,  // 当前控制量：光伏% 负载% 市电电流设定 A（默认满格 10A）
+  soc: 60,                        // 电池荷电状态 %
+  gridMode: false, protect: false,
+  minutes: 6*60,                  // 仿真时钟 06:00 起（清晨日出，与剧情锚点对齐）
+  pvEff: 0,                       // 日照门控后的光伏有效出力%（夜间为 0，供渲染与 I1a 使用）
+  auto: true,
+  live: false,                    // BMS 实时模式：取上位机桥接实测值，不做任何仿真
+  I1:0, I2:0, I3:0, I4:0, I2eff:0,
+  sc:0, scT:0, from:{pv:0,load:50,grid:10},
+  flags:{full:false, prot:false}
+};
+const $ = id => document.getElementById(id);
+const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const ease = t=>t*t*(3-2*t);
+/* 安全读取：输入框异常（清空、非法字符、中间态）时回退默认值，杜绝 NaN 入侵 */
+function numVal(el,def){ const x=+el.value; return Number.isFinite(x)?x:def; }
+/* 日照窗口：06:00–18:00（分钟 360–1079）。日出前/日落后光伏一律休眠，跨 0 点同样无出力 */
+function isDay(m){ return m>=360 && m<1080; }
+
+/* ================= BMS 实时数据接入（上位机本地桥接 /events /api/bms）=================
+   电流语义（与上位机一致）：
+     solar = 光伏电流 I₁（≥0）      mains = 市电电流 I₃（≥0）
+     load  = 上位机"电流(Current)"：有符号，正=电池充电 / 负=电池放电
+   派生：负载 I₂ = 市电 I₃ − Current ；  电池 I₄ = 光伏 I₁ + Current
+   恒满足 I₁ + I₃ = I₂ + I₄ */
+let liveRaw=null, liveLastRx=0, liveRsoc=0, liveFcc=0;
+function liveField(){                       // 字段名兼容（i1/i2/i3 → solar/mains/batt → solar/mains/load）
+  for(let i=0;i<arguments.length;i++){
+    const v=liveRaw[arguments[i]];
+    if(v!==undefined && v!==null && v!=="") return Number(v)||0;
+  }
+  return 0;
+}
+function connectBms(){
+  if(window.EventSource){
+    try{
+      const es=new EventSource(CFG.api+'/events');
+      es.onmessage=ev=>{ try{ onBmsData(JSON.parse(ev.data)); }catch(e){} };
+      es.onerror=()=>{};                    // 断线由浏览器自动重连
+      return;
+    }catch(e){}
+  }
+  (function poll(){
+    fetch(CFG.api+'/api/bms').then(r=>r.json()).then(onBmsData).catch(()=>{})
+      .then(()=>setTimeout(poll,300));
+  })();
+}
+function onBmsData(d){
+  if(!d || typeof d!=="object") return;
+  const was=liveOnline();
+  liveRaw=d; liveLastRx=performance.now();
+  if(sim.live && !was){ log('info','BMS 数据已接入 —— 实时更新中'); }
+}
+function liveOnline(){ return liveLastRx>0 && (performance.now()-liveLastRx)<2000; }
+function liveStep(){
+  if(!liveRaw) return;
+  const s=CFG.mA2A;
+  const cur=liveField('load','batt','i2')*s;    // Current（有符号）
+  const i1=liveField('solar','i1')*s;           // 光伏
+  const i3=liveField('mains','i3')*s;           // 市电
+  sim.I1=i1; sim.I3=i3;
+  sim.I2=Math.max(0, i3-cur);                   // 负载 = 市电 − Current
+  sim.I4=i1+cur;                                // 电池 = 光伏 + Current
+  sim.I2eff=sim.I2;
+  const sc=liveField('soc'); if(sc>=0&&sc<=100) sim.soc=sc;
+  liveRsoc=liveField('rsoc'); liveFcc=liveField('fcc');
+  sim.gridMode=i3>0.05;
+  sim.gridSet=i3;
+  sim.pv=clamp(i1/CFG.pvMax*100,0,100);
+  sim.pvEff=sim.pv;
+  sim.load=clamp(sim.I2/CFG.loadMax*100,0,100);
+  sim.protect=false;
+  if(liveRaw.ts){ const d=new Date(liveRaw.ts); sim.minutes=d.getHours()*60+d.getMinutes(); }
+}
+
+/* ================= 太阳光线（12 条）================= */
+(function(){
+  const g = $('sunRays'); let h='';
+  for(let i=0;i<12;i++){
+    const a=i*30*Math.PI/180, r1=34, r2=46;
+    h+=`<line x1="${205+r1*Math.cos(a)}" y1="${64+r1*Math.sin(a)}" x2="${205+r2*Math.cos(a)}" y2="${64+r2*Math.sin(a)}"/>`;
+  }
+  g.innerHTML=h;
+})();
+
+/* ================= 电流流（虚线滚动 + 粒子）================= */
+const flows=[];
+class Flow{
+  constructor(pid, color, reverseable){
+    this.p=$(pid); this.len=this.p.getTotalLength(); this.color=color;
+    this.rev=reverseable; this.off=0; this.cur=0; this.circles=[];
+    for(let i=0;i<7;i++){
+      const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('r','3.4'); c.setAttribute('fill',color); c.setAttribute('opacity','0');
+      c.setAttribute('filter','url(#glowLine)'); $('particles').appendChild(c);
+      this.circles.push({el:c, t:i/7});
+    }
+    flows.push(this);
+  }
+  set(cur){ this.cur=cur; }
+  step(dt){
+    const on=Math.abs(this.cur)>0.06;
+    this.p.style.opacity=on?1:0;
+    const v=(26+Math.abs(this.cur)*20)*(this.rev&&this.cur<0?-1:1);
+    if(on){ this.off=(this.off+v*dt)%25; this.p.style.strokeDashoffset=-this.off; }
+    for(const c of this.circles){
+      if(!on){ c.el.setAttribute('opacity','0'); continue; }
+      c.t=(c.t+v*dt/this.len+1)%1;
+      const pt=this.p.getPointAtLength(c.t*this.len);
+      c.el.setAttribute('cx',pt.x); c.el.setAttribute('cy',pt.y);
+      c.el.setAttribute('opacity','0.95');
+    }
+  }
+}
+const fPv  =new Flow('pvPath','#fbbf24',false);
+const fGrid=new Flow('gridPath','#22d3ee',false);
+const fBatt=new Flow('battPath','#34d399',true);
+const fLoad=new Flow('loadPath','#fcd34d',false);
+
+/* ================= 自动演示脚本（状态机，SOC 自平衡循环）================= */
+/* clock = 剧情锚点时刻（分钟数 0-1439）：场景切换时时钟对齐到该锚点，
+   场景内时钟匀速前进；夜间/市电为不定长场景，时钟持续走直到条件满足 */
+const SCENES=[
+  {name:'清晨 · 日出光伏渐强', t:10, clock:360,  to:{pv:85,load:40,grid:0}},
+  {name:'正午 · 满功率充电', t:8, clock:720,  to:{pv:100,load:50,grid:0}},
+  {name:'乌云过境 · 光伏骤降', t:8, clock:840,  to:{pv:8,load:55,grid:0}},
+  {name:'云开日出 · 恢复充电', t:6, clock:930,  to:{pv:94,load:55,grid:0}},
+  {name:'日落 · 转电池供电', t:8, clock:1080, to:{pv:0,load:75,grid:0}},
+  {name:'夜间重载 · 电池深度放电', until:s=>s.soc<=CFGs()+0.4, clock:1200, to:{pv:0,load:92,grid:8}},
+  {name:'市电补充 · 边供负载边回充', until:s=>s.soc>=CFGr()-0.4, clock:1410, to:{pv:0,load:50,grid:8}},
+];
+function CFGs(){ return clamp(numVal($('nStart'),20),5,50); }
+function CFGr(){ return clamp(numVal($('nRecover'),30),6,60); }
+function autoStep(dt){
+  const s=SCENES[sim.sc]; sim.scT+=dt;
+  const p=Math.min(1, sim.scT/((s.t||3)*0.8));
+  /* 剧情渐变：注意市电设定属性名是 gridSet（grid 键只存在于 to/from 缓存中），
+     v2.0 起此处误写 sim.grid 导致剧情市电电流从未生效，v2.9 修复 */
+  sim.pv=lerp(sim.from.pv, s.to.pv, ease(p));
+  sim.load=lerp(sim.from.load, s.to.load, ease(p));
+  sim.gridSet=lerp(sim.from.grid, s.to.grid, ease(p));
+  /* 负载自然波动 ±3.5%：模拟真实用电节奏的独立正弦，与光伏强度无关
+     （负载功耗由用户/剧情决定，光伏只改变电池支路电流 I₄） */
+  const wNow=performance.now();
+  sim.load=clamp(sim.load+Math.sin(wNow*0.0006)*2.2+Math.sin(wNow*0.0017)*1.3, 0, 100);
+  /* 剧情时钟：场景内匀速前进（每真实秒 12 仿真分钟），与时间加速档位解耦 */
+  sim.minutes=(sim.minutes+dt*12)%1440;
+  const done = s.t ? sim.scT>=s.t : (s.until(sim)&&sim.scT>4);
+  if(done){ sim.sc=(sim.sc+1)%SCENES.length; sim.scT=0; sim.from={pv:sim.pv,load:sim.load,grid:sim.gridSet};
+    /* 场景切换时时钟对齐到剧情锚点（跨夜即快进到次日清晨） */
+    sim.minutes=SCENES[sim.sc].clock;
+    setScene(SCENES[sim.sc].name); }
+}
+
+/* ================= 事件日志 ================= */
+function log(type,txt){
+  const li=document.createElement('li'); li.className='ev-'+type;
+  li.innerHTML=`<b>${fmtClock()}</b>${txt}`;
+  const ul=$('log'); ul.prepend(li);
+  while(ul.children.length>30) ul.lastChild.remove();
+}
+/* 场景状态更新（舞台画面内），切换时淡入提示 */
+function setScene(t){
+  const el=$('sceneName');
+  if(el.textContent===t) return;
+  el.textContent=t;
+  try{ el.animate([{opacity:.15},{opacity:1}],{duration:600}); }catch(e){}
+}
+
+/* ================= 核心仿真步进 ================= */
+function step(dt){
+  /* BMS 实时模式：直接采用上位机实测数据，不做任何仿真、不做 SOC 积分 */
+  if(sim.live){ liveStep(); return; }
+  /* 数据哨兵：任何路径混入的 NaN 在此自愈，绝不进入积分链路 */
+  if(!Number.isFinite(sim.pv)) sim.pv=0;
+  if(!Number.isFinite(sim.load)) sim.load=50;
+  if(!Number.isFinite(sim.gridSet)) sim.gridSet=10;
+  if(!Number.isFinite(sim.soc)){ sim.soc=60; log('warn','检测到 SOC 数据异常 —— 已自动复位为 60%'); }
+
+  if(sim.auto) autoStep(dt);
+  else { sim.pv=numVal($('rPv'),sim.pv); sim.load=numVal($('rLoad'),sim.load); sim.gridSet=numVal($('rGrid'),sim.gridSet); }
+
+  const s0=CFGs(), rc=Math.max(CFGr(), s0+2);   // 恢复阈值至少高于启动 2%
+  /* 日照门控（仅自动演示）：日出 06:00 前 / 日落 18:00 后（含跨 0 点）光伏休眠。
+     手动模式全权化：光伏电流完全跟随滑块设定，不受时钟/日照约束 */
+  sim.pvEff=(sim.auto && !isDay(sim.minutes))? 0 : sim.pv;
+  const I1a=sim.pvEff/100*CFG.pvMax;             // 光伏可用电流（自动模式已过日照门控）
+  const I2=sim.load/100*CFG.loadMax;             // 负载需求电流
+  const canChg=sim.soc<99.9;
+
+  /* 市电投入判定：
+     自动模式 —— SOC 滞回（≤启动阈值开，≥恢复阈值关）+ 满电即退，体现 BMS 自动互补；
+     手动模式 —— 市电滑块 >0 即投入、归 0 即退出；满电时市电暂停（SOC<95% 自动恢复），
+     避免电池满充后市电继续输出 */
+  if(sim.auto){
+    if(!sim.gridMode && sim.soc<=s0){ sim.gridMode=true;
+      log('in',`市电介入 —— SOC ${sim.soc.toFixed(1)}% ≤ 启动阈值 ${s0}%`); }
+    if(sim.gridMode && sim.soc>=rc){ sim.gridMode=false;
+      log('out',`市电退出 —— SOC 已恢复至 ${sim.soc.toFixed(1)}% ≥ 恢复阈值 ${rc}%`); }
+    if(sim.gridMode && sim.soc>=99.9){ sim.gridMode=false;
+      log('out','电池已充满 —— 市电退出'); }
+  }else{
+    /* 已投入时满电（99.9%）即暂停；暂停后 SOC 降到 95% 以下自动恢复，防边界抖动 */
+    const want=sim.gridSet>0.05 && (sim.gridMode? sim.soc<99.9 : sim.soc<95);
+    if(want!==sim.gridMode){
+      sim.gridMode=want;
+      log(want?'in':'out', want?`市电手动投入 —— 设定 I₃ = ${sim.gridSet.toFixed(1)} A`
+                              :(sim.gridSet>0.05?'电池已充满 —— 市电暂停，SOC<95% 恢复'
+                                                :'市电手动退出 —— 滑块归零'));
+    }
+  }
+
+  const I3=sim.gridMode? Math.min(sim.gridSet,CFG.gridMax) : 0;
+  /* v3.1 撤销负载限幅：市电介入时负载保持设定功耗（不断电不降额），
+     电池继续输出补足缺口：I₄ = I₁+I₃-I₂（缺口为负即放电），
+     待负载回落或光伏充足后 I₄ 自然转正回充 */
+  let I2eff=I2;
+  let I1,I4;
+  /* 统一能量方程：I₄ = I₁ + I₃ - I₂eff（I₃=0 时即 I₄ = I₁ - I₂）
+     满电时充电回路关闭：输入合计被限制到等于负载，光伏优先让位市电 */
+  I1=canChg? I1a : Math.min(I1a, Math.max(0, I2eff-I3));
+  I4=I1+I3-I2eff;
+  if(!canChg&&!sim.flags.full){ sim.flags.full=true; log('full','电池充满 —— 充电回路关闭，光伏出力跟随负载'); }
+  if(canChg) sim.flags.full=false;
+
+  /* 过放保护（极端工况）：SOC 触底后 BMS 切断电池放电 */
+  sim.protect=false;
+  if(sim.soc<=5.01 && I4<0){
+    sim.protect=true; I4=0; I2eff=I1+I3;
+    if(!sim.flags.prot){ sim.flags.prot=true; log('warn','BMS 过放保护 —— 切断电池输出，负载降额运行'); }
+  } else sim.flags.prot=false;
+
+  /* SOC 积分（含时间加速，计算结果二次校验） */
+  const raw=I4/CFG.cap*(dt*spd()/3600)*100;
+  const dSoc=Number.isFinite(raw)?raw:0;
+  sim.soc=clamp(sim.soc+dSoc,5,100);
+
+  sim.I1=I1; sim.I2=I2; sim.I3=I3; sim.I4=I4;
+  sim.I2eff=I2eff;
+  /* 手动模式：时钟按「时间加速」档位推进；自动模式由剧情脚本接管（autoStep） */
+  if(!sim.auto) sim.minutes=(sim.minutes+dt*spd()/60)%1440;
+}
+function spd(){ return sim.auto?1200:clamp(numVal($('nSpeed'),900),60,3600); }
+function fmtClock(){ const m=Math.floor(sim.minutes);
+  return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+
+/* ================= 渲染 ================= */
+function render(){
+  const {I1,I2,I3,I4,I2eff}=sim;
+  /* 流与粒子 */
+  fPv.set(I1); fGrid.set(I3); fLoad.set(I2eff);
+  fBatt.set(I4);
+  fBatt.p.style.stroke=I4>=0?'#34d399':'#fb923c';
+  fBatt.circles.forEach(c=>c.el.setAttribute('fill',I4>=0?'#34d399':'#fb923c'));
+
+  /* 线上标签 */
+  $('lb1').textContent=`I₁ ${I1.toFixed(1)} A`;
+  $('lb3').textContent=`I₃ ${I3.toFixed(1)} A`;
+  $('lb4').textContent=`I₄ ${I4.toFixed(1)} A`;
+  $('lb4').setAttribute('fill',I4>0.05?'#34d399':I4<-0.05?'#fb923c':'#94a3b8');
+  $('lb5').textContent=`I₂ ${I2eff.toFixed(1)} A`;
+
+  /* 天空：太阳 / 云 / 板面亮度（按有效出力；自动模式夜间太阳隐去，手动模式跟随设定） */
+  const dl=sim.auto? isDay(sim.minutes) : true;
+  const avg=sim.pvEff/100;
+  const skyOp=dl? (0.25+avg*0.75).toFixed(2) : '0';
+  $('sunRays').setAttribute('opacity',skyOp);
+  $('sunHalo').setAttribute('opacity',skyOp);
+  $('sunBall').setAttribute('opacity',dl?(0.35+avg*0.65).toFixed(2):'0');
+  $('cloud1').setAttribute('opacity',clamp((0.45-avg)/0.45,0,1)*0.9);
+  $('cloud2').setAttribute('opacity',clamp((0.3-avg)/0.3,0,1)*0.85);
+  $('pvLit').setAttribute('opacity',(avg*0.4).toFixed(2));
+
+  /* BMS 状态行 */
+  const st=$('bmsState');
+  if(sim.protect){ st.textContent='过放保护 · 负载降额'; st.setAttribute('fill','#f87171'); }
+  else if(sim.soc>=99.9){ st.textContent='电池已充满 · 充电关闭'; st.setAttribute('fill','#fbbf24'); }
+  else if(sim.gridMode){ st.textContent='低电量保护 · 市电补充供电'; st.setAttribute('fill','#22d3ee'); }
+  else if(I4>0.05){ st.textContent='太阳能供电 · 电池充电中'; st.setAttribute('fill','#34d399'); }
+  else if(I4<-0.05){ st.textContent='太阳能供电 · 电池放电中'; st.setAttribute('fill','#fb923c'); }
+  else { st.textContent='太阳能供电 · 功率平衡'; st.setAttribute('fill','#94a3b8'); }
+
+  /* 电池 */
+  $('battFill').setAttribute('width',(170*sim.soc/100).toFixed(1));
+  const bc=sim.soc<=CFGs()? '#f87171' : sim.soc<=30? '#fbbf24' : '#34d399';
+  $('battFill').setAttribute('fill',bc);
+  $('battPct').textContent=sim.soc.toFixed(0)+'%';
+  const ba=$('battArrow');
+  if(sim.protect){ ba.textContent='■ 保护'; ba.setAttribute('fill','#f87171'); }
+  else if(I4>0.05){ ba.textContent='▲ 充电'; ba.setAttribute('fill','#34d399'); }
+  else if(I4<-0.05){ ba.textContent='▼ 放电'; ba.setAttribute('fill','#fb923c'); }
+  else { ba.textContent='— 静置'; ba.setAttribute('fill','#94a3b8'); }
+  /* 电池组容量标注：实时模式显示 BMS 的剩余/满充容量（mAh） */
+  if(sim.live && liveFcc>0) $('battCap').textContent=`电池组 · 剩余 ${liveRsoc.toFixed(0)} / 满充 ${liveFcc.toFixed(0)} mAh`;
+  else if(sim.live) $('battCap').textContent='电池组 · BMS 实时';
+  else $('battCap').textContent='电池组 · 100Ah';
+
+  /* 灯组亮度 */
+  const br=clamp(I2eff/CFG.loadMax,0,1);
+  for(const id of ['lamp1','lamp2','lamp3']){
+    const g=$(id);
+    g.querySelector('.halo').setAttribute('opacity',(br*0.95).toFixed(2));
+    g.querySelector('.bulb').setAttribute('fill',br>0.03?`rgb(${30+190*br|0},${28+165*br|0},${20+70*br|0})`:'#1e293b');
+    g.querySelector('.fil').setAttribute('stroke',br>0.03?'#fef9c3':'#475569');
+    g.querySelector('.bulb').setAttribute('stroke',br>0.03?'#fbbf24':'#64748b');
+  }
+
+  /* 右栏仪表 */
+  $('v1').textContent=I1.toFixed(1); $('v2').textContent=I2eff.toFixed(1);
+  $('v3').textContent=I3.toFixed(1); $('v4').textContent=I4.toFixed(1);
+  $('s1').textContent= sim.live ? `BMS 实测 · 光伏 ${sim.I1.toFixed(1)} A`
+    : (sim.auto&&!isDay(sim.minutes))?'夜间时段 · 光伏休眠，06:00 恢复'
+    :`光伏出力 ${sim.pv.toFixed(0)}% · 上限 ${CFG.pvMax}A`;
+  $('s2').textContent=sim.protect?'BMS 保护 · 负载降额':'灯组亮度跟随负载电流';
+  $('s3').textContent=sim.gridMode?`市电输入 ${sim.gridSet.toFixed(1)} A`
+    :(sim.live?'BMS 实测 · 市电为 0':'市电待命 · 未投入');
+  $('w4').className='m-val '+(I4>0.05?'c-green':I4<-0.05?'c-orange':'c-white');
+  $('s4').textContent=I4>0.05?`充电中 · 功率 ${(I4*25.6).toFixed(0)} W`
+    :I4<-0.05?`放电中 · 功率 ${(-I4*25.6).toFixed(0)} W`:'电流平衡 · 静置';
+
+  /* SOC 环 */
+  const C=389.6, p=sim.soc/100;
+  const arc=$('socArc');
+  arc.setAttribute('stroke-dashoffset',(C*(1-p)).toFixed(1));
+  arc.setAttribute('stroke',sim.gridMode?'#22d3ee':sim.soc<=CFGs()?'#f87171':sim.soc<=30?'#fbbf24':'#34d399');
+  $('socNum').textContent=sim.soc.toFixed(1)+'%';
+  /* SOC 变化脉冲：数字每变动 0.5% 闪一下黄光，充放电一目了然 */
+  const socShown=Math.round(sim.soc*2)/2;
+  if(socShown!==lastSocShown){
+    lastSocShown=socShown;
+    try{
+      const kf=[{fill:'#fde047'},{fill:'#f1f5f9'}];
+      $('socNum').animate(kf,{duration:420});
+      $('battPct').animate(kf,{duration:420});
+    }catch(e){}
+  }
+  /* SOC 60 秒趋势曲线：斜率即充放电快慢，变化再慢也看得见 */
+  let pts='';
+  for(let i=0;i<socHist.length;i++) pts+=i+','+(56-socHist[i]*0.48).toFixed(1)+' ';
+  $('socLine').setAttribute('points',pts.trim());
+  $('socDot').setAttribute('cx','119');
+  $('socDot').setAttribute('cy',(56-sim.soc*0.48).toFixed(1));
+  /* 积分速率（%/s 实时）：SOC 按 I₄ 库仑计数积分，速率正比于电池电流 */
+  const rate=sim.I4/CFG.cap*100*spd()/3600;
+  const rateTxt=rate>0.005?` · 积分中 +${rate.toFixed(2)} %/s`
+    :rate<-0.005?` · 积分中 ${rate.toFixed(2)} %/s`:' · 净电流为零，SOC 保持';
+  $('socHint').textContent=(sim.gridMode?'市电补充中，边供负载边回充'
+    :sim.soc<=CFGs()+2?'接近启动阈值，市电即将介入':'SOC 高于启动阈值，市电待命')+rateTxt;
+
+  /* 公式 */
+  $('fNums').innerHTML=
+    `<span class="c-amber">${I1.toFixed(1)}</span> + <span class="c-cyan">${I3.toFixed(1)}</span> = `
+    +`<span class="c-white">${I2eff.toFixed(1)}</span> + <span class="${I4>=0?'c-green':'c-orange'}">${I4.toFixed(1)}</span>`;
+  const e=$('fExp');
+  if(sim.protect) e.textContent='电池已放空，BMS 过放保护切断电池，负载降额运行。';
+  else if(sim.soc>=99.9) e.textContent='电池已充满，充电回路与市电输入均已关闭，负载由光伏或电池直接供电。';
+  else if(sim.gridMode&&I4>0.05) e.textContent=`市电与光伏共同承担负载，并以 ${(I4*25.6).toFixed(0)} W 为电池回充。`;
+  else if(sim.gridMode&&I4<-0.05) e.textContent='市电设定不足，光伏 + 市电仍不能完全覆盖负载，电池辅助放电。';
+  else if(sim.gridMode) e.textContent='市电补足负载缺口，电池收支平衡。';
+  else if(I4>0.05) e.textContent=`光伏出力大于负载，富余 ${(I4*25.6).toFixed(0)} W 为电池充电。`;
+  else if(I4<-0.05) e.textContent=`光伏不足，电池放电 ${(-I4*25.6).toFixed(0)} W 补足负载缺口。`;
+  else e.textContent='光伏出力与负载恰好平衡，电池静置。';
+
+  /* 顶栏徽章与时钟 */
+  const bd=$('modeBadge');
+  if(sim.protect){ bd.className='badge danger'; bd.textContent='⛔ 过放保护'; }
+  else if(sim.gridMode){ bd.className='badge warn'; bd.textContent='⚡ 市电补充供电中'; }
+  else { bd.className='badge ok'; bd.textContent='☀ 光伏独立供电'; }
+  $('clock').firstChild.textContent=fmtClock();
+
+  if(sim.live){
+    $('rPv').value=sim.pv; $('rLoad').value=sim.load; $('rGrid').value=sim.gridSet;
+    const on=liveOnline();
+    $('sceneState').textContent = on?'BMS 实时数据接入中':'BMS 未连接 · 等待数据';
+    setScene(on?'BMS 实时 · 数据接入中':'BMS 实时 · 等待上位机数据');
+  } else if(sim.auto){
+    $('rPv').value=sim.pv; $('rLoad').value=sim.load; $('rGrid').value=sim.gridSet;
+    $('sceneState').textContent='自动演示中';
+  } else $('sceneState').textContent='手动控制模式';
+  $('oPv').textContent=Math.round(sim.pv)+'%'; $('oLoad').textContent=Math.round(sim.load)+'%';
+  $('oGrid').textContent=sim.gridSet.toFixed(1)+'A';
+}
+
+/* ================= 主循环：仿真定时器 + 渲染动画分离 ================= */
+/* 仿真用独立定时器驱动，Δt 按真实墙钟计算：
+   预览面板切到后台时 rAF 会被浏览器暂停（旧版 SOC 因此停止积分），
+   现在即使定时器被节流，回来后也会按真实流逝时间补足积分，SOC 连续不中断。
+   单次 Δt 上限 2 秒，防止长时间冻结后 SOC 突跳。 */
+let lastSim=performance.now();
+let simTick=0;
+const socHist=Array(120).fill(60);   // SOC 历史（60 秒窗口，0.5s 采样）
+let lastSocShown=60;                 // 脉冲高亮基准
+setInterval(()=>{
+  const now=performance.now();
+  const dt=clamp((now-lastSim)/1000,0,2);
+  lastSim=now;
+  step(dt);
+  simTick++;
+  $('hb').style.opacity=(simTick%2)?0.25:1;          // 仿真心跳：停止闪烁=页面被冻结
+  if(simTick%10===0){                                 // 每 0.5s 采样一次 SOC 趋势
+    socHist.push(sim.soc);
+    if(socHist.length>120) socHist.shift();
+  }
+},50);
+
+/* 渲染保持 rAF：粒子流动与画面刷新只在可见时进行 */
+let last=performance.now();
+function loop(){
+  const now=performance.now();
+  const dt=clamp((now-last)/1000,0,0.1); last=now;
+  for(const f of flows) f.step(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ================= 交互 ================= */
+function setSlidersEnabled(on){
+  for(const id of ['rPv','rLoad','rGrid']) $(id).disabled=!on;
+}
+$('btnAuto').onclick=()=>{
+  sim.live=false; sim.auto=true; sim.sc=0; sim.scT=0;
+  sim.from={pv:sim.pv,load:sim.load,grid:sim.gridSet};
+  sim.minutes=SCENES[0].clock;              // 切回自动演示从清晨 06:00 重新开演
+  setScene(SCENES[0].name);
+  $('btnAuto').classList.add('on'); $('btnMan').classList.remove('on'); $('btnLive').classList.remove('on');
+  $('clock').querySelector('small').textContent='仿真时间';
+  setSlidersEnabled(false);
+};
+$('btnMan').onclick=()=>{
+  sim.live=false; sim.auto=false;
+  $('rPv').value=sim.pv; $('rLoad').value=sim.load; $('rGrid').value=sim.gridSet;
+  $('btnMan').classList.add('on'); $('btnAuto').classList.remove('on'); $('btnLive').classList.remove('on');
+  $('clock').querySelector('small').textContent='仿真时间';
+  setSlidersEnabled(true);
+  setScene('手动模式 · 自由调节');
+};
+/* BMS 实时模式：数据取自上位机本地桥接（/events SSE，回退 /api/bms 轮询），只更新数据 */
+$('btnLive').onclick=()=>{
+  sim.live=true; sim.auto=false;
+  $('btnLive').classList.add('on'); $('btnAuto').classList.remove('on'); $('btnMan').classList.remove('on');
+  $('clock').querySelector('small').textContent='真实时间';
+  setSlidersEnabled(false);
+  setScene(liveOnline()?'BMS 实时 · 数据接入中':'BMS 实时 · 等待上位机数据');
+  log('info','切换到 BMS 实时模式 —— 数据来自上位机 @8712');
+};
+$('nStart').addEventListener('change',()=>{
+  const s=CFGs(); $('nStart').value=s;
+  if(numVal($('nRecover'),0)<=s) $('nRecover').value=s+10;
+  log('info',`启动阈值调整为 ${s}%`);
+});
+$('nRecover').addEventListener('change',()=>{
+  const s=CFGs(); let r=clamp(numVal($('nRecover'),30),6,60);
+  if(r<=s) r=s+10; $('nRecover').value=r;
+  log('info',`恢复阈值调整为 ${r}%`);
+});
+$('nSoc').addEventListener('change',()=>{
+  const v=clamp(numVal($('nSoc'),60),5,100);
+  $('nSoc').value=v; sim.soc=v;
+  log('info',`SOC 手动设定为 ${v}%`);
+});
+$('nBrand').addEventListener('input',e=>{ $('brand').value=e.target.value; });
+$('brand').addEventListener('input',e=>{ $('nBrand').value=e.target.value; });
+$('btnReset').onclick=()=>{
+  sim.soc=60; sim.minutes=6*60; sim.gridMode=false; sim.protect=false;
+  sim.flags={full:false,prot:false}; sim.sc=0; sim.scT=0;
+  sim.from={pv:0,load:50,grid:10}; sim.pv=0; sim.load=50; sim.gridSet=10; sim.pvEff=0;
+  $('rGrid').value=10; $('nSoc').value=60;
+  $('log').innerHTML=''; setScene(SCENES[0].name);
+  log('info','系统复位 —— SOC 60% · 时钟 06:00 · 市电待命 10A');
+};
+$('btnFs').onclick=()=>{
+  if(!document.fullscreenElement) document.documentElement.requestFullscreen();
+  else document.exitFullscreen();
+};
+
+/* ================= 启动 ================= */
+$('verBadge').textContent=APP_VER;
+$('verBadge').title='更新记录\n'+VER_LOG.join('\n');
+connectBms();                                       // 启动即连接上位机桥接（收到数据后切"BMS 实时"即生效）
+log('info','演示启动 —— SOC 60% · 市电待命 · 光伏就绪');
+/* 渲染循环已在「主循环」节注册一次，此处不再重复注册 */
+</script>
+</body>
+</html>

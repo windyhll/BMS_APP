@@ -55,6 +55,8 @@
     </Reference>
     <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="Microsoft.VisualBasic.PowerPacks.Vs, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <!-- 随仓库分发的本地副本：没装 VS / VB Power Packs 的机器也能直接编译 -->
+      <HintPath>..\ddl\Microsoft.VisualBasic.PowerPacks.Vs.dll</HintPath>
       <!-- 强制复制到输出目录：否则只在装了 VS/PowerPacks 的机器上能跑，换机器会缺这个 DLL -->
       <Private>True</Private>
     </Reference>

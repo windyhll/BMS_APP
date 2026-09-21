@@ -8885,6 +8885,7 @@
             // 
             // comInfo
             // 
+            this.comInfo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.comInfo.AutoSize = true;
             this.comInfo.Font = new System.Drawing.Font("微软雅黑", 9F);
             this.comInfo.ImeMode = System.Windows.Forms.ImeMode.NoControl;
@@ -8897,6 +8898,7 @@
             // 
             // timeAndDate
             // 
+            this.timeAndDate.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.timeAndDate.AutoSize = true;
             this.timeAndDate.Font = new System.Drawing.Font("微软雅黑", 9F);
             this.timeAndDate.ImeMode = System.Windows.Forms.ImeMode.NoControl;
@@ -8909,6 +8911,7 @@
             // 
             // label225
             // 
+            this.label225.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.label225.AutoSize = true;
             this.label225.Font = new System.Drawing.Font("微软雅黑", 9F);
             this.label225.ImeMode = System.Windows.Forms.ImeMode.NoControl;

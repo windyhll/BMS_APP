@@ -134,7 +134,8 @@ namespace BMS上位机
             {
                 bmsStyle = f2.str;
             }
-            this.MaximizeBox = false;
+            // 允许最大化（原来这里写的是 MaximizeBox = false，把最大化按钮关掉了）
+            this.MaximizeBox = true;
             if ("4S" == bmsStyle)
             {
                 m_cellNumTrue = 4;
@@ -510,26 +511,34 @@ namespace BMS上位机
             // ---- 后台上传（每 500ms）：把实时数据推给演示网页，与串口读取解耦 ----
             m_bridgeTimer = new System.Windows.Forms.Timer();
             m_bridgeTimer.Interval = 500;
-            m_bridgeTimer.Tick += delegate(object s2, EventArgs e2) { PushToBridge(); };
+            m_bridgeTimer.Tick += delegate(object s2, EventArgs e2) { PushToBridge(); RefreshBatteryPage(); };
             m_bridgeTimer.Start();
 
-            // ---- 在「电池信息」页右下角空框内增加按钮：直接打开网页版演示 ----
-            m_btnOpenDemo = new Button();
-            m_btnOpenDemo.Text = "打开网页演示";
-            m_btnOpenDemo.Font = new System.Drawing.Font("Microsoft YaHei", 10F, System.Drawing.FontStyle.Bold);
-            m_btnOpenDemo.Size = new System.Drawing.Size(150, 42);
-            m_btnOpenDemo.BackColor = System.Drawing.Color.FromArgb(70, 150, 240);
-            m_btnOpenDemo.ForeColor = System.Drawing.Color.White;
-            m_btnOpenDemo.FlatStyle = FlatStyle.Flat;
-            // 位置交给 InitArtLayout/ApplyArtLayout 按"设计坐标 × 缩放比"摆放，
-            // 这样换电脑时它也跟背景图上的空框一起缩，不会偏（此处只给个初始值）
+            // ---- 「网页互动」按钮：新版放窗口右上角（自绘科技按钮），旧版仍按背景图坐标摆 ----
+            m_btnOpenDemo = new TechButton();
+            m_btnOpenDemo.Text = "网页互动";
+            m_btnOpenDemo.Size = new System.Drawing.Size(146, 40);
+            // 位置：新版由 LayoutTopRight() 贴右上角；旧版由 InitArtLayout/ApplyArtLayout 按
+            // "设计坐标 × 缩放比"摆放，这样换电脑时它跟背景图上的空框一起缩，不会偏
             m_btnOpenDemo.Location = new System.Drawing.Point(10, 10);
             m_btnOpenDemo.Click += delegate(object s3, EventArgs e3) { OpenDemoPage(); };
             电池信息.Controls.Add(m_btnOpenDemo);
             m_btnOpenDemo.BringToFront();
 
-            // ---- 电池信息页自动适配：让页面数据始终与背景图上的表格线/方框对齐 ----
-            InitArtLayout();
+            // ---- 「电池信息」页：新版整页控件化（Dock 布局，最大化/换分辨率自动适配）----
+            //      出问题就把 BatteryPageNew.cs 里的 USE_NEW_BATT_PAGE 改成 false，即回到旧版
+            if (USE_NEW_BATT_PAGE)
+            {
+                BuildBatteryPage();
+                StyleTabs();                 // 顶部标签条改成自绘（36px / 三态）
+                BuildTopRightActions();      // 顶部右端：保存到文件胶囊开关
+                LayoutMain();                                        // 主窗体 + TabControl 随窗口伸缩
+                this.Resize += delegate(object s5, EventArgs e5) { LayoutMain(); };
+            }
+            else
+            {
+                InitArtLayout();     // 旧版：背景图 + 绝对坐标 + 手动缩放
+            }
         }
 
         private void timer1_Tick(object sender, EventArgs e)
@@ -1853,6 +1862,29 @@ namespace BMS上位机
                                         }
                                     
                                      }
+                                    // 市电MOS(市电开关) / PWMMOS(太阳能开关)：状态颜色无条件刷新（不受调试开关影响），
+                                    // 供新版「电池信息」页常显（旧背景图版仍由 g_display_test 控制可见性）
+                                    if ((rcvBuf[116] & (int)0x01 << 7) == 0x80)
+                                    {
+                                        PWMMOS.FillColor = Color.MediumSeaGreen;
+                                        pwmmosFlg = 1;
+                                    }
+                                    else
+                                    {
+                                        PWMMOS.FillColor = Color.Red;
+                                        pwmmosFlg = 0;
+                                    }
+                                    if ((rcvBuf[117] & (int)0x01 << 2) == 0x04)
+                                    {
+                                        MainMOS.FillColor = Color.MediumSeaGreen;
+                                        mainmosFlg = 1;
+                                    }
+                                    else
+                                    {
+                                        MainMOS.FillColor = Color.Red;
+                                        mainmosFlg = 0;
+                                    }
+
                                     if (g_display_test == 1)
                                     {
                                         for (int i = 0; i < 12; i++)
@@ -1865,28 +1897,6 @@ namespace BMS上位机
                                         this.PWMMOS.Visible = true;
                                         this.label15.Visible = true;
                                         this.label31.Visible = true;
-                                        if ((rcvBuf[116] & (int)0x01 << 7) == 0x80)
-                                        {
-                                            
-                                            PWMMOS.FillColor = Color.MediumSeaGreen;
-                                            pwmmosFlg = 1;
-                                        }
-                                        else
-                                        {
-                                            PWMMOS.FillColor = Color.Red;
-                                            pwmmosFlg = 0;
-                                        }
-                                        if ((rcvBuf[117] & (int)0x01 << 2) == 0x04)
-                                        {
-                                            
-                                            MainMOS.FillColor = Color.MediumSeaGreen;
-                                            mainmosFlg = 1;
-                                        }
-                                        else
-                                        {
-                                            MainMOS.FillColor = Color.Red;
-                                            mainmosFlg = 0;
-                                        }
                                     }
                                     else
                                     {
@@ -2536,7 +2546,6 @@ namespace BMS上位机
             byte[] rcvBuf = new byte[512];
             byte[] tmpBuf = new byte[512];
             int[] tmp32 = new int[20];
-            int temp;
             int addr = 0;
             int totalLength = 0;
             bool rcved_num = false;
@@ -4990,12 +4999,12 @@ namespace BMS上位机
         //        ⇒ 图与控件永远同源同步，任何电脑/分辨率/DPI 都自动对齐，无需人工调整。
         // ==================================================================================
         private const double ART_DES_W = 1633.0, ART_DES_H = 906.0;   // 设计时的页面尺寸（Designer 里的 电池信息.Size）
-        // 「打开网页演示」按钮在设计页面里的中心 = 背景图右下角那个空框的"正中"
+        // 「网页互动」按钮（旧版路径）在设计页面里的中心 = 背景图右下角那个空框的"正中"
         //   空框在背景图里是 x 1337..1760、y 730..859（图像素）
         //   换算：设计x = imgx × 0.92679 ；设计y = 34.1 + imgy × 0.9268
         //   ⇒ 空框中心 = ((1337+1760)/2, (730+859)/2) 图像素 → 设计 (1435, 771)
         private const double BTN_DES_CX = 1435.0, BTN_DES_CY = 771.0;
-        private Button m_btnOpenDemo;
+        private TechButton m_btnOpenDemo;           // 自绘科技按钮；新版贴窗口右上角，旧版按背景图坐标缩放摆放
         private Image m_artImg;                     // 背景图
         private RectangleF m_artDesign;             // 背景图在"设计页面"里的矩形
         private Rectangle m_artRect;                // 背景图当前的屏幕矩形
@@ -5078,8 +5087,9 @@ namespace BMS上位机
                         Math.Max(4, (int)Math.Round(R.Width * fx)),
                         Math.Max(4, (int)Math.Round(R.Height * fy)));
                 }
-                // 网页演示按钮：按设计坐标 × 缩放比摆放（与背景图上的空框一起缩放，换机不偏）
-                if (m_btnOpenDemo != null)
+                // 网页互动按钮：按设计坐标 × 缩放比摆放（与背景图上的空框一起缩放，换机不偏）
+                // ⚠️ 新版页面下它贴在窗口右上角，由 LayoutTopRight() 管，这里必须跳过
+                if (m_btnOpenDemo != null && !USE_NEW_BATT_PAGE)
                 {
                     int bx = (int)Math.Round(BTN_DES_CX * fx) - m_btnOpenDemo.Width / 2;
                     int by = (int)Math.Round(BTN_DES_CY * fy) - m_btnOpenDemo.Height / 2;
@@ -6720,7 +6730,7 @@ namespace BMS上位机
 
                 serialPort1.Write(transStr, 0, length);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return false;
             }

@@ -34,3 +34,7 @@ ehthumbs.db
 /MOS*预览.png
 /按钮*.png
 /*_示意.png
+
+# 改代码时留下的临时备份（如 ParamPagesNew.cs.bak-round / Form1.cs.bak-write）
+*.bak
+*.bak-*

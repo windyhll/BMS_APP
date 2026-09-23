@@ -109,6 +109,10 @@ namespace BMS上位机
 
         private void Two_Bytes_Write(byte[] data, int ptr, int div, string txt)
         {
+            // ⚠️ 这里**必须**用 UInt16.Parse（会抛异常），**不要**改成 TryParse 静默按 0 处理：
+            //    写下去的值必须是用户确认过的。若某个框没读出值/被清空，宁可抛异常中止这包写入，
+            //    也绝不能把 0（或任何猜出来的值）发给设备 —— 那是把参数改成错误值，比写不进去更糟。
+            //    （2026-09-23 应要求还原成原始写法）
             data[ptr] = (byte)(UInt16.Parse(txt) / div);
             data[ptr + 1] = (byte)((UInt16.Parse(txt) / div) >> 8);
         }
@@ -1610,9 +1614,10 @@ namespace BMS上位机
                                     //
                                     //版本号 78
                                     //
-                                    double flt;
-                                    flt = (double)rcvBuf[78] / 10;
-                                    VER.Text = flt.ToString("0.0");
+                                    // 软件版本：一个字节按十进制拆成"主.次.修订"三位（0.0.0 格式）。
+                                    // 原来写的是 `flt.ToString("0.0")`（一位小数）⇒ 123 会显示成 "12.3"。
+                                    VER.Text = string.Format("{0}.{1}.{2}",
+                                        rcvBuf[78] / 100, (rcvBuf[78] / 10) % 10, rcvBuf[78] % 10);
                                     //
                                     //SOC 79
                                     //
@@ -2152,9 +2157,10 @@ namespace BMS上位机
                                     //
                                     //版本号 78
                                     //
-                                    double flt;
-                                    flt = (double)rcvBuf[78] / 10;
-                                    VER.Text = flt.ToString("0.0");
+                                    // 软件版本：一个字节按十进制拆成"主.次.修订"三位（0.0.0 格式）。
+                                    // 原来写的是 `flt.ToString("0.0")`（一位小数）⇒ 123 会显示成 "12.3"。
+                                    VER.Text = string.Format("{0}.{1}.{2}",
+                                        rcvBuf[78] / 100, (rcvBuf[78] / 10) % 10, rcvBuf[78] % 10);
                                     //
                                     //SOC 79
                                     //
@@ -2751,15 +2757,17 @@ namespace BMS上位机
                 Two_Bytes_Write(data, ptr, 1, ManuYear.Text);//62
 
                 //开关量
+                //  ⚠️ 原来只认 `.Text == "开启"` 精确匹配，一旦 Text 为空/带空格就会静默写成"关闭"；
+                //     改用 `ParamOn()`（Trim + SelectedIndex 兜底），语义与原来一致。
                 int tmp = 0;
-                tmp |= (BalanEN.Text == "开启") ? 1 : 0;
-                tmp |= (ChgBalanSelect.Text == "开启") ? 2 : 0;
-                tmp |= (comboSleep.Text == "开启") ? 4 : 0;
-                tmp |= (OccRelease.Text == "开启") ? 8 : 0;
-                tmp |= (ScRelease.Text == "开启") ? 16 : 0;
-                tmp |= (comboMainFirst.Text == "开启") ? 32 : 0;
-                tmp |= (comboSWAlways.Text == "开启") ? 64 : 0;
-                tmp |= (comboSOCLEARN.Text == "开启") ? 128 : 0;
+                tmp |= ParamOn(BalanEN) ? 1 : 0;
+                tmp |= ParamOn(ChgBalanSelect) ? 2 : 0;
+                tmp |= ParamOn(comboSleep) ? 4 : 0;
+                tmp |= ParamOn(OccRelease) ? 8 : 0;
+                tmp |= ParamOn(ScRelease) ? 16 : 0;
+                tmp |= ParamOn(comboMainFirst) ? 32 : 0;
+                tmp |= ParamOn(comboSWAlways) ? 64 : 0;
+                tmp |= ParamOn(comboSOCLEARN) ? 128 : 0;
 
                 ptr += 2;
                 Two_Bytes_Write(data, ptr, 1, tmp.ToString());//64~65
@@ -5209,7 +5217,9 @@ namespace BMS上位机
 
         private void Form1_Load_1(object sender, EventArgs e)
         {
-
+            // 窗体尺寸 / 字体 / DPI 全部就位后再排一次：
+            // 「基本参数」「校准控制」两页卡片的缩放基准这时才是最终值
+            LayoutMain();
         }
 
         bool Read_UartBaud() // 读参数

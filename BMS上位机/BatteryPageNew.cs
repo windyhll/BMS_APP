@@ -35,6 +35,7 @@ namespace BMS上位机
         private DataGridView _bpPowerParams;        // ③光伏 / 市电参数
         private DataGridView _bpFaults;             // ④保护标志
         private readonly bool[] _bpFaultOn = new bool[13];   // ④保护标志：每行是否有告警
+        private bool[] _bpBalOn = new bool[0];                // ①电芯表"均衡"列：每行是否在均衡（自绘圆点用）
         private Label _bpSocPct, _bpChgDsg;
         private TableLayoutPanel _bpTempRow;                  // NTC 温度行（居中容器）
         private TableLayoutPanel _bpTempInner;                // 温度行内容（AutoSize）
@@ -161,9 +162,32 @@ namespace BMS上位机
         private Control BuildCellsGrid()
         {
             DataGridView g = NewGrid();
-            g.Columns.Add(NewCol("序号", 48, DataGridViewContentAlignment.MiddleCenter));
-            g.Columns.Add(NewCol("电压 (mV)", 0, DataGridViewContentAlignment.MiddleRight));     // Fill：吸收剩余宽度
-            g.Columns.Add(NewCol("均衡", 56, DataGridViewContentAlignment.MiddleCenter));
+            g.Columns.Add(NewCol("序号", 60, DataGridViewContentAlignment.MiddleCenter));
+            // 电压列比原来窄（原来是 Fill 独吞剩余宽度）；均衡列放宽，圆点才画得大
+            DataGridViewTextBoxColumn vcol = NewCol("电压 (mV)", 0, DataGridViewContentAlignment.MiddleRight);
+            vcol.FillWeight = 55f;
+            g.Columns.Add(vcol);
+            DataGridViewTextBoxColumn bcol = NewCol("均衡", 0, DataGridViewContentAlignment.MiddleCenter);
+            bcol.FillWeight = 45f;
+            g.Columns.Add(bcol);
+
+            // 「均衡」列自绘圆点（原来是把 "●" 当文本，字号受行高限制、点很小）：
+            // 直径最大 20px、随行高自适应，颜色与原来一致（均衡 = 绿，未均衡 = 灰）
+            g.CellPainting += delegate(object s, DataGridViewCellPaintingEventArgs e)
+            {
+                if (e.RowIndex < 0 || e.ColumnIndex != 2) return;
+                e.PaintBackground(e.CellBounds, true);
+                int d = Math.Min(20, Math.Min(e.CellBounds.Width - 10, e.CellBounds.Height - 6));
+                if (d < 8) d = 8;
+                int cx = e.CellBounds.X + (e.CellBounds.Width - d) / 2;
+                int cy = e.CellBounds.Y + (e.CellBounds.Height - d) / 2;
+                bool on = (e.RowIndex < _bpBalOn.Length) && _bpBalOn[e.RowIndex];
+                Color fill = on ? Color.FromArgb(60, 179, 113) : Color.FromArgb(216, 218, 220);
+                Color edge = on ? Color.FromArgb(32, 140, 80) : Color.FromArgb(190, 192, 196);
+                using (SolidBrush b = new SolidBrush(fill)) e.Graphics.FillEllipse(b, cx, cy, d, d);
+                using (Pen p = new Pen(edge)) e.Graphics.DrawEllipse(p, cx, cy, d, d);
+                e.Handled = true;
+            };
             _bpCells = g;
             return WrapInGroup("电芯电压 · 均衡", g);
         }
@@ -376,6 +400,8 @@ namespace BMS上位机
         {
             if (!_bpBuilt || _bpRoot == null) return;
             if (this.IsDisposed) return;
+            // 性能探针：这个方法每 500ms 跑一次，如果某次超过 120ms 会往 exe 目录的 perf.log 记一行
+            System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 // ① 电芯表：每行 = 一节电芯（序号 → 电压 → 均衡 → 温度，一一对应）
@@ -384,27 +410,27 @@ namespace BMS上位机
                 if (n > 40) n = 40;
                 bool dbg = (g_display_test == 1);
                 EnsureCellRows(n, dbg);
+                bool balChg = false;
+                if (_bpBalOn.Length != _bpCells.Rows.Count) _bpBalOn = new bool[_bpCells.Rows.Count];
                 for (int r = 0; r < _bpRows.Count && r < _bpCells.Rows.Count; r++)
                 {
                     RowDef d = _bpRows[r];
                     DataGridViewRow row = _bpCells.Rows[r];
                     int k = d.Idx;
                     if (k < 0 || k >= _srcCells.Length) continue;
-                    row.Cells[1].Value = _srcCells[k].Text;
-                    row.Cells[2].Value = "●";
-                    row.Cells[1].Style.ForeColor = (_srcCells[k].ForeColor);
-                    if (d.Kind == 2)                            // 调试行：数值灰显、均衡灰点
-                    {
-                        row.Cells[1].Style.ForeColor = Color.FromArgb(120, 120, 120);
-                        row.Cells[2].Style.ForeColor = Color.Gainsboro;
-                    }
-                    else                                        // 真实电芯
-                    {
-                        row.Cells[2].Style.ForeColor =
-                            (_srcBlans[k].FillColor != Color.Transparent)
-                            ? Color.MediumSeaGreen : Color.Gainsboro;
-                    }
+
+                    // ⚠️ 只在值真的变了才写：无条件写 Value / Style 会让单元格每帧重画
+                    //    （用户看到的"整列文字偶尔闪一下"就是这个）
+                    string sv = _srcCells[k].Text;
+                    if (!object.Equals(row.Cells[1].Value, sv)) row.Cells[1].Value = sv;
+                    Color fg = (d.Kind == 2) ? Color.FromArgb(120, 120, 120) : _srcCells[k].ForeColor;
+                    if (row.Cells[1].Style.ForeColor != fg) row.Cells[1].Style.ForeColor = fg;
+
+                    // 「均衡」列：值不再用 "●" 文本，改由 CellPainting 画点；这里只维护状态
+                    bool on = (d.Kind != 2) && (_srcBlans[k].FillColor != Color.Transparent);
+                    if (r < _bpBalOn.Length && _bpBalOn[r] != on) { _bpBalOn[r] = on; balChg = true; }
                 }
+                if (balChg) _bpCells.InvalidateColumn(2);       // 只有均衡状态变了才重画那一列
                 if (_bpCells.SelectedCells.Count > 0) _bpCells.ClearSelection();
 
                 // ② 电池参数（11 项）
@@ -477,15 +503,29 @@ namespace BMS上位机
                 if (_bpGridIcon != null) _bpGridIcon.On = HasCurrent(iMainSupply.Text);
 
                 // ④ 保护标志：告警 = 大号红点，正常 = 灰点（单元格自绘）
+                bool faultChg = false;
                 for (int i = 0; i < _srcFauts.Length && i < _bpFaultOn.Length; i++)
-                    _bpFaultOn[i] = (_srcFauts[i].FillColor != Color.Transparent);
+                {
+                    bool on = (_srcFauts[i].FillColor != Color.Transparent);
+                    if (_bpFaultOn[i] != on) { _bpFaultOn[i] = on; faultChg = true; }
+                }
                 if (_bpFaults != null)
                 {
-                    if (_bpFaults.SelectedCells.Count > 0) _bpFaults.ClearSelection();
-                    _bpFaults.Invalidate();
+                    // ⚠️ 原来无条件 _bpFaults.Invalidate() 整表 → 每帧整列重画，用户看到的是
+                    //    "充电过流这些字也在闪"。改成只在告警状态真的变化时重画"状态"列。
+                    if (faultChg)
+                    {
+                        if (_bpFaults.SelectedCells.Count > 0) _bpFaults.ClearSelection();
+                        _bpFaults.InvalidateColumn(1);
+                    }
                 }
             }
             catch { }
+            finally
+            {
+                sw.Stop();
+                Form1.PerfLog("刷新电池页", sw.ElapsedMilliseconds);
+            }
         }
 
         // 重排行：电芯 1..N → 调试行 25~36（调试开启且 N<25 时）
@@ -550,6 +590,10 @@ namespace BMS上位机
         //  ⚠️ 只在"新版页面"下生效：旧版页面是"背景图 + 绝对坐标"，一变形就会错位。
         private void LayoutMain()
         {
+            // 「基本参数」/「校准控制」两页 + **TabControl 尺寸本身**都走同一个防抖（Resize 连发时
+            // 只做轻量更新，尺寸稳定后 140ms 再做一趟）：改 tabControl1 尺寸会让整棵控件树重排
+            // （含电池页 4 个 DataGridView），每个 Resize 事件都做一遍 ⇒ 拖窗口/最大化卡好几秒。
+            ScheduleLayoutParamPages();
             if (!USE_NEW_BATT_PAGE) return;
             try
             {
@@ -557,25 +601,23 @@ namespace BMS上位机
                 int ch = this.ClientSize.Height;
                 if (cw < 100 || ch < 100) return;
 
-                if (tabControl1 != null)
-                {
-                    int left = tabControl1.Left;
-                    int top = tabControl1.Top;
-                    int w = cw - left * 2;
-                    int h = ch - top - 46;
-                    if (w > 300 && h > 200 && (tabControl1.Width != w || tabControl1.Height != h))
-                        tabControl1.Bounds = new Rectangle(left, top, w, h);
-                }
+                _mainSizePending = true;      // TabControl 尺寸等防抖那一趟再应用
 
+                // 状态条这几行只改 Top/Left，是零成本的 ⇒ 保持实时跟随；
+                // BringToFront 只在真的挪动了才调（每次调用都会改 Z 序、引发重绘）
                 int y = ch - 32;
                 if (y < 0) y = 0;
-                if (comInfo != null) { comInfo.Top = y; comInfo.BringToFront(); }
-                if (label225 != null) { label225.Top = y; label225.BringToFront(); }
+                if (comInfo != null && comInfo.Top != y) { comInfo.Top = y; comInfo.BringToFront(); }
+                if (label225 != null && label225.Top != y) { label225.Top = y; label225.BringToFront(); }
                 if (timeAndDate != null)
                 {
-                    timeAndDate.Top = y;
-                    timeAndDate.Left = Math.Max(24, cw - timeAndDate.Width - 16);
-                    timeAndDate.BringToFront();
+                    int tx = Math.Max(24, cw - timeAndDate.Width - 16);
+                    if (timeAndDate.Top != y || timeAndDate.Left != tx)
+                    {
+                        timeAndDate.Top = y;
+                        timeAndDate.Left = tx;
+                        timeAndDate.BringToFront();
+                    }
                 }
 
                 LayoutTopRight();        // 顶部工具条右端的「保存到文件」开关 /「网页互动」按钮
@@ -735,7 +777,7 @@ namespace BMS上位机
             {
                 _bpSaveToggle = new ToggleSwitch();
                 _bpSaveToggle.Caption = "保存到文件";
-                _bpSaveToggle.Size = new Size(158, 38);
+                _bpSaveToggle.Size = new Size(158, 34);      // 34 高：正好塞进 36px 的自绘标签条（见 LayoutTopRight）
                 _bpSaveToggle.On = (checkBoxSaveData != null) && checkBoxSaveData.Checked;
                 _bpSaveToggle.Click += delegate
                 {
@@ -755,7 +797,7 @@ namespace BMS上位机
                 // 「网页互动」按钮：原来是 ③/④列底部的蓝色方块，这里换成深色科技按钮
                 if (m_btnOpenDemo != null)
                 {
-                    m_btnOpenDemo.Size = new Size(146, 40);
+                    m_btnOpenDemo.Size = new Size(146, 34);
                     this.Controls.Add(m_btnOpenDemo);
                 }
                 this.Controls.Add(_bpSaveToggle);
@@ -772,19 +814,50 @@ namespace BMS上位机
             try
             {
                 int cw = this.ClientSize.Width;
-                if (cw < 400) return;
-                int y = 17;                                   // 与串口工具条同一水平线（y 16~62）
-                int right = cw - 14;
-                if (m_btnOpenDemo != null)
-                {
-                    m_btnOpenDemo.Location = new Point(right - m_btnOpenDemo.Width, y);
-                    m_btnOpenDemo.BringToFront();
-                    right = m_btnOpenDemo.Left - 12;
-                }
+                if (cw < 400 || tabControl1 == null) return;
+
+                // 🚨 不能钉在"顶部工具条那一行"的右端：串口工具条那些控件是 **Designer 绝对坐标、
+                //    不随窗口缩**，窗口一窄（用户实测 cw≈1300）右边的"地址"输入框就被这两个控件盖住。
+                //    ⇒ 改放到**标签条那一行（第二行）的右侧空白**：4 个标签只占 134×4 ≈ 536px，
+                //       右边一大片空着，而且永远不可能和任何控件重叠。
+                //    窗口窄到连标签条右侧都放不下 ⇒ **直接隐藏**（宁可看不见，也绝不重叠）。
+                int stripH = tabControl1.ItemSize.Height;
+                if (stripH < 10) stripH = 36;
+                int stripTop = tabControl1.Top + 3;                  // 自绘标签条的上沿
+                int stripRight = tabControl1.Left + tabControl1.ItemSize.Width * tabControl1.TabCount + 6;
+
+                int wTog = (_bpSaveToggle != null) ? _bpSaveToggle.Width : 0;
+                int wBtn = (m_btnOpenDemo != null) ? m_btnOpenDemo.Width : 0;
+                int gap = (wTog > 0 && wBtn > 0) ? 12 : 0;
+                int need = wTog + gap + wBtn;
+
+                int x = cw - 14 - need;
+                bool room = (x >= stripRight);
+                // ⚠️ `Visible=` / `Location=` / `BringToFront()`（改 Z 序）都会引发重绘或重排，
+                //    而本方法是**每个 Resize 事件都跑**的 ⇒ 一律"只在真的变了才写"。
+                if (_bpSaveToggle != null && _bpSaveToggle.Visible != room) _bpSaveToggle.Visible = room;
+                if (m_btnOpenDemo != null && m_btnOpenDemo.Visible != room) m_btnOpenDemo.Visible = room;
+                if (!room) return;
+
+                // 顺序与原来一致：左＝「保存到文件」开关，右＝「网页互动」按钮，垂直居中于标签条
                 if (_bpSaveToggle != null)
                 {
-                    _bpSaveToggle.Location = new Point(right - _bpSaveToggle.Width, y + 1);
-                    _bpSaveToggle.BringToFront();
+                    Point np = new Point(x, stripTop + Math.Max(0, (stripH - _bpSaveToggle.Height) / 2));
+                    if (_bpSaveToggle.Location != np)
+                    {
+                        _bpSaveToggle.Location = np;
+                        _bpSaveToggle.BringToFront();
+                    }
+                    x += wTog + gap;
+                }
+                if (m_btnOpenDemo != null)
+                {
+                    Point np = new Point(x, stripTop + Math.Max(0, (stripH - m_btnOpenDemo.Height) / 2));
+                    if (m_btnOpenDemo.Location != np)
+                    {
+                        m_btnOpenDemo.Location = np;
+                        m_btnOpenDemo.BringToFront();
+                    }
                 }
             }
             catch { }
@@ -831,6 +904,15 @@ namespace BMS上位机
             g.DefaultCellStyle.SelectionBackColor = Color.White;
             g.DefaultCellStyle.SelectionForeColor = Color.FromArgb(26, 26, 26);
             g.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(246, 246, 246);
+            // DataGridView 默认不开双缓冲，刷新时整表重绘会闪 → 用反射打开
+            //（配合"只在变化时才写 Value / Invalidate"一起用）
+            try
+            {
+                System.Reflection.PropertyInfo pi = typeof(DataGridView).GetProperty(
+                    "DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                if (pi != null) pi.SetValue(g, true, null);
+            }
+            catch { }
             return g;
         }
 
@@ -1087,7 +1169,9 @@ namespace BMS上位机
 
                 if (!string.IsNullOrEmpty(_cap))
                 {
-                    using (Font f = new Font("Microsoft YaHei", 10F, _on ? FontStyle.Bold : FontStyle.Regular))
+                    // ⚠️ 不写死字号：三页要统一缩放，写死的字号不会跟着变
+                    using (Font f = new Font(this.Font.FontFamily, this.Font.Size * 1.1f,
+                                             _on ? FontStyle.Bold : FontStyle.Regular))
                     using (SolidBrush b = new SolidBrush(capC))
                     using (StringFormat sf = new StringFormat())
                     {
@@ -1503,10 +1587,10 @@ namespace BMS上位机
                 {
                     sf.Alignment = StringAlignment.Center;
                     sf.LineAlignment = StringAlignment.Center;
-                    using (Font f1 = new Font("Microsoft YaHei", 8.5F, FontStyle.Bold))
+                    using (Font f1 = new Font(this.Font.FontFamily, this.Font.Size * (8.5f / 9f), FontStyle.Bold))
                         g.DrawString(line1, f1, fg,
                             new RectangleF(0f, 3f, Width, 17f), sf);
-                    using (Font f2 = new Font("Microsoft YaHei", 9.5F, FontStyle.Bold))
+                    using (Font f2 = new Font(this.Font.FontFamily, this.Font.Size * (9.5f / 9f), FontStyle.Bold))
                         g.DrawString(line2, f2, fg,
                             new RectangleF(0f, 19f, Width, 22f), sf);
                 }
